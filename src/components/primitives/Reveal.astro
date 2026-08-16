@@ -1,0 +1,20 @@
+---
+/**
+ * Reveal — wraps children, adds reveal-init for the scroll-reveal
+ * observer (scripts/reveal.ts). Content is visible-by-default in CSS;
+ * JS only enhances the entrance (fail-safe per design system §8).
+ */
+interface Props {
+  class?: string;
+  /** transition delay in ms */
+  delay?: number;
+}
+const { class: className, delay } = Astro.props;
+---
+
+<div
+  class={`reveal reveal-init ${className ?? ""}`}
+  style={delay ? `transition-delay: ${delay}ms;` : undefined}
+>
+  <slot />
+</div>

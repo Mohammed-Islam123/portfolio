@@ -1,0 +1,213 @@
+<!--
+  Greeting — cycles the hero greeting through the languages spoken
+  in Algiers (English → French → Arabic), using a Text Scramble
+  transition instead of a boring fade.
+
+  SCRAMBLE (Justin Windle / Aidan Wolter style, 2009-era classic)
+  When the word changes, each character rapidly cycles through
+  random glyphs before "settling" one-by-one into the final letter.
+  The effect reads as: `hello` → `bØn¿ÿr` → `b!n¥r` → `bonjour`
+  settling left-to-right (Latin) or right-to-left (Arabic).
+
+  Character set adapts to the target language:
+    • Latin targets (hello, bonjour) — scramble through ASCII noise
+      (mostly spaces so it reads as "wind blowing through" rather
+      than dense garbage).
+    • Arabic target (مرحبا) — scramble through Arabic letters so it
+      reads as "Arabic being typed."
+
+  Reveal order is random-but-deterministic per transition (shuffled
+  indices) so it doesn't look mechanical. ~60fps randomization during
+  the scramble, then settle one character every ~40ms. Total transition
+  ~600–800ms depending on word length.
+
+  REDUCED MOTION — skip the scramble entirely, fall back to the
+  original fade+blur+lift (460ms), just swapping the text directly.
+
+  STATIC-FIRST — the build renders the first word statically. The
+  scramble only fires on the SECOND word (after the script runs).
+
+  ── Pieces that are unchanged ──────────────────────────────────────
+    • Waving hand SVG + wave keyframe (hand stays calm while text
+      scrambles — motion in the text, calm in the hand).
+    • `dir="auto"` on the text span (handles Arabic RTL).
+    • `--ink-muted` color + sizing from the parent <p>.
+    • Display interval 3.2s (scramble itself takes ~700ms).
+-->
+<hero-greeting class="inline-flex items-baseline gap-2.5">
+  <!-- waving hand — monochrome (warm light gray) to match the portfolio
+       theme. Gentle wave on a loop + a fresh wave each time the greeting
+       word changes (the script re-fires the CSS animation per swap). -->
+  <span
+    class="greet-hand inline-flex translate-y-[0.05em] text-[var(--ink-soft)]"
+    style="animation: hand-wave 2.6s ease-in-out infinite; filter: drop-shadow(0 0 6px rgba(255,255,255,0.28));"
+    aria-hidden="true"
+  >
+    <svg
+      viewBox="0 0 24 24"
+      width="1.05em"
+      height="1.05em"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <!-- a friendly waving hand — palm with splayed fingers, tilted -->
+      <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V10"></path>
+      <path d="M11 10V4.5a1.5 1.5 0 0 1 3 0V10"></path>
+      <path d="M14 10.5V6a1.5 1.5 0 0 1 3 0v6"></path>
+      <path d="M17 9.5a1.5 1.5 0 0 1 3 0v4.5a7 7 0 0 1-7 7h-1.5a7 7 0 0 1-6.7-5L3 13a1.6 1.6 0 0 1 2.7-1.7L8 13"></path>
+    </svg>
+  </span>
+  <!-- the greeting text — driven by the Scrambler during a swap,
+       otherwise shows the settled word. The swap restarts the greet-in
+       fade animation on top of the scramble (the fade masks the first
+       frame of garbage). `dir="auto"` lets Arabic render RTL correctly
+       even though the line is otherwise LTR. -->
+  <span
+    class="greet-word text-[var(--ink-muted)]"
+    dir="auto"
+    style="display: inline-block; animation: greet-in 460ms var(--ease) both;"
+  >
+    hello</span
+  >
+  <!-- sr-only live region — announces the settled greeting word to
+       screen readers (the scramble itself is noise, so we only
+       announce once per swap, after the scramble completes). -->
+  <span class="sr-only greet-live" aria-live="polite">hello</span>
+</hero-greeting>
+
+<script>
+  import { siteConfig } from "../config/site";
+  import { Scrambler } from "../lib/scrambler";
+
+  class HeroGreetingEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      const greetings = siteConfig.greetings;
+      const wordEl = this.querySelector<HTMLElement>(".greet-word");
+      const handEl = this.querySelector<HTMLElement>(".greet-hand");
+      const liveEl = this.querySelector<HTMLElement>(".greet-live");
+      if (!wordEl || !liveEl) return;
+
+      let i = 0;
+      let text: string = greetings[0].text;
+
+      // restart a CSS animation in place (used instead of React's
+      // key-remount to re-fire greet-in / hand-wave on each swap)
+      const restartAnim = (el: HTMLElement, anim: string) => {
+        el.style.animation = "none";
+        void el.offsetWidth;
+        el.style.animation = anim;
+      };
+
+      // reduced motion → no scramble, just swap text directly.
+      // The greet-in fade still re-fires on each swap.
+      const reducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      if (reducedMotion) {
+        const id = setInterval(() => {
+          i = (i + 1) % greetings.length;
+          text = greetings[i].text;
+          wordEl.textContent = text;
+          wordEl.setAttribute("lang", greetings[i].lang);
+          liveEl.textContent = text;
+          restartAnim(wordEl, "greet-in 460ms var(--ease) both");
+          if (handEl)
+            restartAnim(handEl, "hand-wave 2.6s ease-in-out infinite");
+        }, 3200);
+        this.cleanupFns.push(() => clearInterval(id));
+        return;
+      }
+
+      // Scrambler — writes scramble frames directly to the DOM.
+      const scrambler = new Scrambler(
+        (t) => {
+          text = t;
+          wordEl.textContent = t;
+        },
+        () => {
+          liveEl.textContent = greetings[i].text;
+        },
+      );
+
+      const id = setInterval(() => {
+        const next = (i + 1) % greetings.length;
+        const fromText = greetings[i].text;
+        const toText = greetings[next].text;
+        i = next;
+        // re-fire the greet-in fade-in animation on top of the
+        // scramble + a fresh hand wave (parity with the React key swap)
+        restartAnim(wordEl, "greet-in 460ms var(--ease) both");
+        if (handEl) restartAnim(handEl, "hand-wave 2.6s ease-in-out infinite");
+        wordEl.setAttribute("lang", greetings[i].lang);
+        // start the scramble slightly after the fade-in begins so the
+        // fade masks the first frame of garbage.
+        setTimeout(() => {
+          scrambler.start(fromText, toText);
+        }, 60);
+      }, 3200);
+
+      this.cleanupFns.push(() => {
+        clearInterval(id);
+        scrambler.cancel();
+      });
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("hero-greeting", HeroGreetingEl);
+</script>
+
+<style>
+  @keyframes greet-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+      filter: blur(2px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+      filter: blur(0);
+    }
+  }
+  @keyframes hand-wave {
+    0% {
+      transform: rotate(0deg);
+    }
+    12% {
+      transform: rotate(16deg);
+    }
+    24% {
+      transform: rotate(-8deg);
+    }
+    36% {
+      transform: rotate(14deg);
+    }
+    48% {
+      transform: rotate(-4deg);
+    }
+    60% {
+      transform: rotate(10deg);
+    }
+    72% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .greet-hand {
+      animation: none !important;
+    }
+  }
+</style>

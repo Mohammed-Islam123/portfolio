@@ -1,0 +1,103 @@
+---
+/**
+ * Root layout — html shell, meta, fonts, global chrome.
+ *
+ * Typography — theoptimisticdesigner.com-inspired.
+ *
+ *  Sans  : Geist — Vercel's humanist-geometric sans. A close peer of
+ *          the reference site's Switzer (modern, technical, warm, highly
+ *          legible). Used for ALL text: hero name, section titles, body,
+ *          UI. Single-typeface discipline — the reference uses one sans
+ *          for everything, no serif.
+ *  Mono  : Geist Mono — used ONLY for tiny eyebrow labels, timestamps,
+ *          terminal facts, nav, footer. The reference site uses Geist
+ *          Mono for exactly these micro-labels (with ~0.08em positive
+ *          tracking).
+ *
+ * The reference is PURELY monochrome (warm grays on #0B0B0B, no accent
+ * color). The amber signal accent is retained ONLY for the semantic
+ * "open to work" status dot and focus rings — everything else goes
+ * monochrome to match the reference.
+ */
+import { ClientRouter } from "astro:transitions";
+import { siteConfig } from "../config/site";
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+
+const {
+  title = "Mohamed Islam — Backend Engineer",
+  description = "Mohamed Islam Benyahkem — backend engineer in Algiers. Protocols, data paths, and the bits that decide 40ms vs 400ms.",
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL("/og.png", Astro.site);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta
+      name="keywords"
+      content="backend engineer, system design, distributed systems, C#, .NET, Astro, portfolio"
+    />
+    <meta name="author" content="Mohamed Islam Benyahkem" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <ClientRouter />
+
+    <!-- no-FOUC theme script: set the html class from localStorage /
+         prefers-color-scheme BEFORE first paint so the correct palette
+         renders immediately (no white flash on dark load, no dark flash
+         on light load). Re-applied after every ClientRouter swap so a
+         stale class never leaks between pages. -->
+    <script is:inline>
+      (function () {
+        function applyTheme() {
+          try {
+            var t = localStorage.getItem("theme");
+            if (!t) {
+              t = window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+            }
+            var root = document.documentElement;
+            root.classList.remove("dark", "light");
+            root.classList.add(t);
+          } catch (e) {
+            document.documentElement.classList.add("dark");
+          }
+        }
+        document.addEventListener("astro:after-swap", applyTheme);
+        applyTheme();
+      })();
+    </script>
+  </head>
+  <body class="antialiased">
+    <slot />
+    <!-- global chrome (init-once singletons; see scripts for lifecycle) -->
+    <script>
+      import "../scripts/smooth-scroll";
+      import "../scripts/custom-cursor";
+      import "../scripts/reveal";
+      import "../scripts/sound-init";
+    </script>
+  </body>
+</html>

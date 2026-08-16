@@ -1,0 +1,231 @@
+<!--
+  DotField — calm grid of monochrome dots with a subtle pulse and
+  mouse-proximity bloom. Rendered behind the hero portrait; a radial
+  vignette fades the center to the page background so the portrait
+  never competes with the field.
+
+  - Canvas 2D (no WebGL dependency)
+  - Paused when off-screen (IntersectionObserver)
+  - Static render on prefers-reduced-motion
+  - devicePixelRatio capped at 2
+
+  Web Component lifecycle: connectedCallback re-runs after every
+  ClientRouter body swap (home page re-entry).
+-->
+<dot-field class="pointer-events-none absolute inset-0 overflow-hidden block" aria-hidden="true">
+  <canvas class="block h-full w-full"></canvas>
+  <!-- radial vignette: darken center (where the portrait sits) → bg.
+       Uses --scrim-color so it adapts to the active theme. -->
+  <div
+    class="absolute inset-0"
+    style="background: radial-gradient(ellipse 45% 60% at 50% 42%, var(--bg) 0%, var(--bg) 38%, rgba(var(--scrim-color), 0.55) 62%, transparent 88%);"
+  >
+  </div>
+  <!-- top + bottom fade to bg -->
+  <div
+    class="absolute inset-0"
+    style="background: linear-gradient(to bottom, var(--bg) 0%, transparent 12%, transparent 80%, var(--bg) 100%);"
+  >
+  </div>
+</dot-field>
+
+<script>
+  class DotFieldEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      const canvas = this.querySelector<HTMLCanvasElement>("canvas");
+      if (!canvas) return;
+
+      const ctx = canvas.getContext("2d", { alpha: true });
+      if (!ctx) return;
+
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+
+      // read the field color + alpha boost from CSS so the canvas adapts to
+      // the active theme (white on dark, dark on light) and stays equally
+      // visible in both (dark-on-light needs a higher alpha to read as
+      // strongly as white-on-dark). Re-read on resize in case the theme flipped.
+      const fieldColor = () => {
+        const v = getComputedStyle(document.documentElement)
+          .getPropertyValue("--field-color")
+          .trim();
+        return v || "255, 255, 255";
+      };
+      const fieldBoost = () => {
+        const v = parseFloat(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--field-alpha-boost")
+            .trim(),
+        );
+        return Number.isFinite(v) && v > 0 ? v : 1;
+      };
+      let color = fieldColor();
+      let boost = fieldBoost();
+
+      let w = 0;
+      let h = 0;
+      let dpr = 1;
+      let raf = 0;
+      let running = false;
+      const mouse = { x: -9999, y: -9999, active: false };
+      const GAP = 34; // px between dots (CSS px)
+      const BASE_R = 0.9;
+
+      const dots: { x: number; y: number; phase: number }[] = [];
+
+      const build = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = this.getBoundingClientRect();
+        w = rect.width;
+        h = rect.height;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        dots.length = 0;
+        const cols = Math.ceil(w / GAP) + 1;
+        const rows = Math.ceil(h / GAP) + 1;
+        const offsetX = (w - (cols - 1) * GAP) / 2;
+        const offsetY = (h - (rows - 1) * GAP) / 2;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            dots.push({
+              x: offsetX + c * GAP,
+              y: offsetY + r * GAP,
+              phase: Math.random() * Math.PI * 2,
+            });
+          }
+        }
+      };
+
+      // center for vignette computation
+      let cx = 0;
+      let cy = 0;
+      let maxD = 1;
+
+      const draw = (t: number) => {
+        ctx.clearRect(0, 0, w, h);
+        const time = t / 1000;
+        cx = w / 2;
+        cy = h * 0.42;
+        maxD = Math.hypot(w, h) * 0.5;
+
+        for (let i = 0; i < dots.length; i++) {
+          const d = dots[i];
+          const pulse = 0.5 + 0.5 * Math.sin(time * 0.8 + d.phase);
+          let r = BASE_R + pulse * 0.5;
+
+          // distance-from-center vignette: brighter near center, fades to edges
+          const dd = Math.hypot(d.x - cx, d.y - cy) / maxD;
+          const vignette = Math.max(0, 1 - dd * 1.15);
+          let alpha = (0.08 + pulse * 0.12) * (0.35 + vignette * 0.65) * boost;
+
+          // mouse proximity bloom
+          if (mouse.active) {
+            const dx = d.x - mouse.x;
+            const dy = d.y - mouse.y;
+            const dist2 = dx * dx + dy * dy;
+            const RADIUS = 150;
+            if (dist2 < RADIUS * RADIUS) {
+              const k = 1 - Math.sqrt(dist2) / RADIUS;
+              r += k * 2.4;
+              alpha += k * 0.6 * boost;
+            }
+          }
+
+          ctx.beginPath();
+          ctx.arc(d.x, d.y, r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${color}, ${Math.min(alpha, 0.85)})`;
+          ctx.fill();
+        }
+      };
+
+      const drawStatic = () => {
+        ctx.clearRect(0, 0, w, h);
+        cx = w / 2;
+        cy = h * 0.42;
+        maxD = Math.hypot(w, h) * 0.5;
+        for (let i = 0; i < dots.length; i++) {
+          const d = dots[i];
+          const dd = Math.hypot(d.x - cx, d.y - cy) / maxD;
+          const vignette = Math.max(0, 1 - dd * 1.15);
+          const alpha = 0.22 * (0.35 + vignette * 0.65) * boost;
+          ctx.beginPath();
+          ctx.arc(d.x, d.y, BASE_R + 0.4, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${color}, ${alpha})`;
+          ctx.fill();
+        }
+      };
+
+      const loop = (t: number) => {
+        draw(t);
+        raf = requestAnimationFrame(loop);
+      };
+
+      const start = () => {
+        if (running || reduced) return;
+        running = true;
+        raf = requestAnimationFrame(loop);
+      };
+      const stop = () => {
+        running = false;
+        cancelAnimationFrame(raf);
+      };
+
+      const onResize = () => {
+        color = fieldColor(); // re-read in case the theme flipped
+        boost = fieldBoost();
+        build();
+        if (reduced) drawStatic();
+      };
+
+      const onMove = (e: MouseEvent) => {
+        const rect = this.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+        mouse.active = true;
+      };
+      const onLeave = () => {
+        mouse.active = false;
+        mouse.x = -9999;
+        mouse.y = -9999;
+      };
+
+      build();
+      if (reduced) {
+        drawStatic();
+      } else {
+        // visibility-gated run
+        const io = new IntersectionObserver(
+          ([entry]) => (entry.isIntersecting ? start() : stop()),
+          { threshold: 0 },
+        );
+        io.observe(this);
+
+        window.addEventListener("resize", onResize);
+        window.addEventListener("mousemove", onMove, { passive: true });
+        this.addEventListener("mouseleave", onLeave);
+
+        this.cleanupFns.push(() => {
+          stop();
+          io.disconnect();
+          window.removeEventListener("resize", onResize);
+          window.removeEventListener("mousemove", onMove);
+          this.removeEventListener("mouseleave", onLeave);
+        });
+      }
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("dot-field", DotFieldEl);
+</script>

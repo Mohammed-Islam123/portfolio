@@ -1,0 +1,106 @@
+---
+/**
+ * TechIcon — renders a tech logo from simple-icons, or a 2-letter mono
+ * abbreviation for tools that don't have a logo ("abbr:XX" syntax).
+ *
+ * Rendered entirely at build time (server-side) — zero client JS.
+ *
+ * @prop icon  simple-icons slug (e.g. "dotnet") or "abbr:EF"
+ * @prop brand hex color used for the glyph (matches the cell's brand)
+ * @prop size  px size of the svg
+ */
+import {
+  siDotnet,
+  siPostgresql,
+  siDocker,
+  siRust,
+  siReact,
+  siTypescript,
+  siAstro,
+  siTailwindcss,
+  siRedis,
+  siGithubactions,
+  siLinux,
+  siGit,
+  siJsonwebtokens,
+  siRos,
+  siHtml5,
+  siGnubash,
+  siNginx,
+  siGo,
+  siClickhouse,
+  siGrafana,
+  siKubernetes,
+  siPrometheus,
+  type SimpleIcon,
+} from "simple-icons";
+
+const REGISTRY: Record<string, SimpleIcon> = {
+  dotnet: siDotnet,
+  postgresql: siPostgresql,
+  docker: siDocker,
+  rust: siRust,
+  react: siReact,
+  typescript: siTypescript,
+  astro: siAstro,
+  tailwindcss: siTailwindcss,
+  redis: siRedis,
+  githubactions: siGithubactions,
+  linux: siLinux,
+  git: siGit,
+  jsonwebtokens: siJsonwebtokens,
+  ros: siRos,
+  html5: siHtml5,
+  gnubash: siGnubash,
+  nginx: siNginx,
+  go: siGo,
+  clickhouse: siClickhouse,
+  grafana: siGrafana,
+  kubernetes: siKubernetes,
+  prometheus: siPrometheus,
+};
+
+interface Props {
+  icon: string;
+  brand: string;
+  size?: number;
+  class?: string;
+}
+
+const { icon, brand, size = 22, class: className } = Astro.props;
+
+const isAbbr = icon.startsWith("abbr:");
+// unknown slug — fall back to the first 2 letters
+const abbr = isAbbr
+  ? icon.slice(5).toUpperCase()
+  : REGISTRY[icon]
+    ? null
+    : icon.slice(0, 2).toUpperCase();
+const data = !isAbbr && !abbr ? REGISTRY[icon] : null;
+---
+
+{
+  data ? (
+    <svg
+      class={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={brand}
+      aria-hidden="true"
+    >
+      <path d={data.path} />
+    </svg>
+  ) : (
+    // AbbrGlyph — a 2-letter abbreviation wrapped in a brand-colored ghost
+    // frame so abbreviated tools (EF, SR, QC) have the same visual weight
+    // as logo icons.
+    <span
+      class={className}
+      style={`display: inline-flex; align-items: center; justify-content: center; width: ${size}px; height: ${size}px; border-radius: ${Math.max(4, size * 0.18)}px; border: 1px solid ${brand}40; background: ${brand}10; font-family: var(--font-mono); font-weight: 700; font-size: ${size * 0.42}px; line-height: 1; color: ${brand}; letter-spacing: -0.02em;`}
+      aria-hidden="true"
+    >
+      {abbr}
+    </span>
+  )
+}

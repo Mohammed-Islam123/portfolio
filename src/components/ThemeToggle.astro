@@ -1,0 +1,151 @@
+<!--
+  ThemeToggle — dark/light switch with a circular reveal animation.
+
+  • theme is one of "dark" | "light"
+  • persisted to localStorage("theme")
+  • initial value = localStorage → prefers-color-scheme → "dark"
+  • an inline <script> in Layout.astro sets the html class before first
+    paint to avoid FOUC
+
+  Icon visibility — CSS-driven, NOT JS state
+  ──────────────────────────────────────────
+  The sun/moon icon swap is driven by the `html.dark` / `html.light`
+  class via CSS (see `.theme-icon-sun` / `.theme-icon-moon` in
+  global.css), NOT by JS state. Both SVGs render identically at build
+  time and CSS shows the correct one immediately based on the html
+  class that the no-FOUC script already set.
+
+  Circular reveal
+  ───────────────
+  Uses the View Transitions API (Chrome/Edge 111+) to animate the theme
+  switch as a circle expanding from the toggle button's click point —
+  the new theme "wipes in" radially instead of swapping instantly.
+  Falls back to an instant class swap on browsers without VT support
+  (Safari, Firefox) — still works, just without the animation.
+-->
+<theme-toggle>
+  <!-- aria-label / title are static ("toggle theme") rather than
+       direction-specific ("switch to dark/light") to avoid needing
+       JS state for the label (theme isn't known at build time). -->
+  <button
+    type="button"
+    class="theme-toggle-btn group/theme relative flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-[color,border-color,background-color,transform] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 hover:border-[var(--ink-muted)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+    aria-label="toggle theme"
+    title="toggle theme"
+  >
+    <!-- sun (shown in dark mode → click to go light).
+         Visibility is CSS-driven via .theme-icon-sun (see global.css). -->
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      class="theme-icon-sun absolute"
+    >
+      <circle cx="12" cy="12" r="4"></circle>
+      <path
+        d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
+      ></path>
+    </svg>
+    <!-- moon (shown in light mode → click to go dark).
+         Visibility is CSS-driven via .theme-icon-moon (see global.css). -->
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="1.8"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      class="theme-icon-moon absolute"
+    >
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+    </svg>
+  </button>
+</theme-toggle>
+
+<script>
+  import { playSound } from "../scripts/sound-init";
+
+  class ThemeToggleEl extends HTMLElement {
+    connectedCallback() {
+      const btn = this.querySelector<HTMLButtonElement>(".theme-toggle-btn");
+      if (!btn) return;
+
+      btn.addEventListener("mouseenter", () => playSound("hover"));
+      btn.addEventListener("click", () => {
+        void this.toggle();
+      });
+    }
+
+    private async toggle() {
+      const root = document.documentElement;
+      const next: "dark" | "light" = root.classList.contains("light")
+        ? "dark"
+        : "light";
+
+      // click point — center of THIS toggle instance (multiple instances
+      // can be in the DOM: desktop pill + mobile dropdown; only one is
+      // visible at a time, and the event's button is the right anchor)
+      const btn = this.querySelector<HTMLButtonElement>(".theme-toggle-btn");
+      const rect = btn?.getBoundingClientRect();
+      const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+      const y = rect ? rect.top + rect.height / 2 : 0;
+
+      const apply = () => {
+        root.classList.remove("light", "dark");
+        root.classList.add(next);
+        localStorage.setItem("theme", next);
+        // The DotField + AmbientSignal canvases capture --field-color and
+        // --field-alpha-boost in closure vars and only re-read them on
+        // resize. Dispatching a resize event here forces both canvases to
+        // re-read the CSS vars so the dots/lines switch color + opacity to
+        // match the new theme. (Cheaper than a custom event + listener per
+        // canvas, and resize is already debounced by the browser.)
+        window.dispatchEvent(new Event("resize"));
+      };
+
+      // View Transitions API → circular reveal
+      const vt = (
+        document as Document & {
+          startViewTransition?: (cb: () => void) => { ready: Promise<void> };
+        }
+      ).startViewTransition;
+
+      if (vt && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const transition = vt.call(document, apply);
+        await transition.ready;
+        const endRadius = Math.hypot(
+          Math.max(x, window.innerWidth - x),
+          Math.max(y, window.innerHeight - y),
+        );
+        document.documentElement.animate(
+          {
+            clipPath: [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${endRadius}px at ${x}px ${y}px)`,
+            ],
+          },
+          {
+            duration: 520,
+            easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+            pseudoElement: "::view-transition-new(root)",
+          },
+        );
+      } else {
+        apply();
+      }
+
+      playSound("click");
+    }
+  }
+
+  customElements.define("theme-toggle", ThemeToggleEl);
+</script>

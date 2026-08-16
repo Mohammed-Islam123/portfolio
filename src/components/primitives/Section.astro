@@ -1,0 +1,12 @@
+---
+/** Section — semantic wrapper with consistent padding. */
+interface Props {
+  id?: string;
+  class?: string;
+}
+const { id, class: className } = Astro.props;
+---
+
+<section id={id} class={`py-[clamp(5rem,12vh,8rem)] relative ${className ?? ""}`}>
+  <slot />
+</section>

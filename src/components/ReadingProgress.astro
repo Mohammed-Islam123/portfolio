@@ -1,0 +1,54 @@
+<!--
+  ReadingProgress — thin amber progress bar fixed at the top of the viewport.
+  Shows reading progress as a percentage of the page scrolled.
+  Only rendered on project detail pages. Respects reduced-motion.
+-->
+<reading-progress>
+  <div
+    class="rp-bar fixed top-0 left-0 z-[60] h-[2px] transition-[width] duration-100 ease-out"
+    style="width: 0%; background: linear-gradient(90deg, var(--signal) 0%, var(--signal-2) 100%); box-shadow: 0 0 8px var(--signal-glow), 0 1px 2px rgba(0,0,0,0.3);"
+    aria-hidden="true"
+    hidden
+  ></div>
+</reading-progress>
+
+<script>
+  class ReadingProgressEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+      if (mq.matches) return; // no animation on reduced-motion
+
+      const bar = this.querySelector<HTMLElement>(".rp-bar");
+      if (!bar) return;
+
+      let raf = 0;
+      const onScroll = () => {
+        cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+          const doc = document.documentElement;
+          const scrollTop = window.scrollY;
+          const scrollHeight = doc.scrollHeight - doc.clientHeight;
+          if (scrollHeight <= 0) return;
+          const progress = Math.min(100, (scrollTop / scrollHeight) * 100);
+          bar.style.width = `${progress}%`;
+          bar.hidden = progress <= 0;
+        });
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+      this.cleanupFns.push(() => {
+        window.removeEventListener("scroll", onScroll);
+        cancelAnimationFrame(raf);
+      });
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("reading-progress", ReadingProgressEl);
+</script>

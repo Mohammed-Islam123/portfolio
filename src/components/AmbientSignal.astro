@@ -1,0 +1,240 @@
+---
+/**
+ * AmbientSignal — a few slow horizontal sine lines drifting across the
+ * footer. Reads as "signal on the wire" — calm, atmospheric, never loud.
+ *
+ * - Canvas 2D, monochrome white, very low opacity
+ * - Mouse-reactive: lines bend toward the cursor with a falloff, and a
+ *   soft white bloom follows the cursor position
+ * - Paused when off-screen (IntersectionObserver)
+ * - Static single render on prefers-reduced-motion
+ */
+interface Props {
+  class?: string;
+}
+const { class: className } = Astro.props;
+---
+
+<ambient-signal class={`pointer-events-none absolute inset-0 overflow-hidden block ${className ?? ""}`} aria-hidden="true">
+  <canvas class="block h-full w-full"></canvas>
+  <!-- fade edges to bg -->
+  <div
+    class="pointer-events-none absolute inset-0"
+    style="background: linear-gradient(to right, var(--bg) 0%, transparent 15%, transparent 85%, var(--bg) 100%);"
+  >
+  </div>
+</ambient-signal>
+
+<script>
+  class AmbientSignalEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      const canvas = this.querySelector<HTMLCanvasElement>("canvas");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      const reduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      const finePointer = window.matchMedia("(pointer: fine)").matches;
+
+      // line color adapts to theme (white on dark, dark on light)
+      const lineColor = () =>
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--field-color")
+          .trim() || "255, 255, 255";
+      let color = lineColor();
+      // alpha boost — dark-on-light reads dimmer at the same alpha, so light
+      // mode multiplies line alpha to stay visible. Re-read on resize.
+      const boostVal = () => {
+        const v = parseFloat(
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--field-alpha-boost")
+            .trim(),
+        );
+        return Number.isFinite(v) && v > 0 ? v : 1;
+      };
+      let boost = boostVal();
+
+      let w = 0;
+      let h = 0;
+      let dpr = 1;
+      let raf = 0;
+      let running = false;
+
+      // mouse target + smoothed position
+      const mouse = { tx: -9999, ty: -9999, x: -9999, y: -9999 };
+
+      const LINES = [
+        { y: 0.3, amp: 14, freq: 0.008, speed: 0.25, alpha: 0.32, width: 1 },
+        { y: 0.5, amp: 22, freq: 0.006, speed: 0.18, alpha: 0.22, width: 1.2 },
+        { y: 0.7, amp: 10, freq: 0.011, speed: 0.32, alpha: 0.18, width: 1 },
+      ];
+
+      const build = () => {
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = this.getBoundingClientRect();
+        w = rect.width;
+        h = rect.height;
+        canvas.width = Math.floor(w * dpr);
+        canvas.height = Math.floor(h * dpr);
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      };
+
+      const draw = (t: number) => {
+        ctx.clearRect(0, 0, w, h);
+        const time = t / 1000;
+
+        // smooth mouse position toward target (lerp 0.12)
+        mouse.x += (mouse.tx - mouse.x) * 0.12;
+        mouse.y += (mouse.ty - mouse.y) * 0.12;
+        const hasMouse = mouse.tx > -9000;
+
+        // soft white bloom at cursor — adds depth + "the wire is alive" feel
+        if (hasMouse) {
+          const bloomR = 180;
+          const grad = ctx.createRadialGradient(
+            mouse.x,
+            mouse.y,
+            0,
+            mouse.x,
+            mouse.y,
+            bloomR,
+          );
+          grad.addColorStop(0, `rgba(${color}, ${0.1 * boost})`);
+          grad.addColorStop(0.5, `rgba(${color}, ${0.03 * boost})`);
+          grad.addColorStop(1, `rgba(${color}, 0)`);
+          ctx.fillStyle = grad;
+          ctx.fillRect(mouse.x - bloomR, mouse.y - bloomR, bloomR * 2, bloomR * 2);
+        }
+
+        for (const line of LINES) {
+          const baseY = h * line.y;
+          ctx.beginPath();
+          ctx.moveTo(0, baseY);
+          for (let x = 0; x <= w; x += 4) {
+            let y =
+              baseY +
+              Math.sin(x * line.freq + time * line.speed * Math.PI * 2) *
+                line.amp;
+
+            // mouse displacement: lines bend toward cursor with a gaussian falloff
+            if (hasMouse) {
+              const dx = x - mouse.x;
+              const dy = baseY - mouse.y;
+              const dist2 = dx * dx + dy * dy;
+              const falloff = Math.exp(-dist2 / (2 * 120 * 120)); // sigma=120px
+              // pull line toward cursor y, scaled by falloff
+              y += (mouse.y - baseY) * falloff * 0.35;
+              // also boost amplitude near cursor for a "ripple" effect
+              y += Math.sin(time * 4 + x * 0.05) * 6 * falloff;
+            }
+            ctx.lineTo(x, y);
+          }
+          // lines brighten slightly near the cursor — global alpha bump
+          const alpha = hasMouse ? line.alpha + 0.06 : line.alpha;
+          ctx.strokeStyle = `rgba(${color}, ${Math.min(alpha * boost, 0.85)})`;
+          ctx.lineWidth = line.width;
+          ctx.stroke();
+        }
+      };
+
+      const drawStatic = () => {
+        ctx.clearRect(0, 0, w, h);
+        for (const line of LINES) {
+          const baseY = h * line.y;
+          ctx.beginPath();
+          ctx.moveTo(0, baseY);
+          for (let x = 0; x <= w; x += 4) {
+            const y = baseY + Math.sin(x * line.freq) * line.amp;
+            ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = `rgba(${color}, ${line.alpha * 0.7 * boost})`;
+          ctx.lineWidth = line.width;
+          ctx.stroke();
+        }
+      };
+
+      const loop = (t: number) => {
+        draw(t);
+        raf = requestAnimationFrame(loop);
+      };
+      const start = () => {
+        if (running || reduced) return;
+        running = true;
+        raf = requestAnimationFrame(loop);
+      };
+      const stop = () => {
+        running = false;
+        cancelAnimationFrame(raf);
+      };
+
+      const onResize = () => {
+        color = lineColor(); // re-read in case the theme flipped
+        boost = boostVal();
+        build();
+        if (reduced) drawStatic();
+      };
+
+      // track mouse position relative to the wrapper.
+      // We listen on `window` (not the wrapper) because the wrapper has
+      // pointer-events-none so it doesn't block clicks on the CTA above.
+      const onMouseMove = (e: MouseEvent) => {
+        const rect = this.getBoundingClientRect();
+        const rx = e.clientX - rect.left;
+        const ry = e.clientY - rect.top;
+        // only track if the cursor is within the wrapper (with a margin)
+        if (rx >= -50 && rx <= rect.width + 50 && ry >= -50 && ry <= rect.height + 50) {
+          mouse.tx = rx;
+          mouse.ty = ry;
+        } else {
+          // cursor left the wrapper — drift the smoothed pos off-screen too
+          mouse.tx = -9999;
+          mouse.ty = -9999;
+        }
+      };
+
+      build();
+      if (reduced) {
+        drawStatic();
+      } else {
+        // Start immediately if already in viewport on connect —
+        // IntersectionObserver only fires on changes.
+        const rect = this.getBoundingClientRect();
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        if (rect.top < vh && rect.bottom > 0) {
+          start();
+        }
+        const io = new IntersectionObserver(
+          ([entry]) => (entry.isIntersecting ? start() : stop()),
+          { threshold: 0 },
+        );
+        io.observe(this);
+        window.addEventListener("resize", onResize);
+        // only track mouse on fine-pointer devices (skip touch)
+        if (finePointer) {
+          window.addEventListener("mousemove", onMouseMove, { passive: true });
+        }
+        this.cleanupFns.push(() => {
+          stop();
+          io.disconnect();
+          window.removeEventListener("resize", onResize);
+          if (finePointer) {
+            window.removeEventListener("mousemove", onMouseMove);
+          }
+        });
+      }
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("ambient-signal", AmbientSignalEl);
+</script>

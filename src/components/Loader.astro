@@ -1,0 +1,522 @@
+<!--
+  Loader — terminal-style loading overlay shown before the hero appears.
+
+  ── Visual ──────────────────────────────────────────────────────────
+  Transparent overlay (the hero's <dot-field> is visible underneath
+  — per design decision #4, no double canvas). Centered terminal block:
+
+      ~/mohamed-islam $ whoami<block>
+      [##########..........] 47%
+
+    • prompt `~/mohamed-islam $` in `--ink-dim`, followed by a real
+      non-breaking space (`\u00A0`) so the gap never collapses.
+    • command `whoami` types in `--ink` at 30ms/char (180ms total),
+      starting 1300ms in (300ms fade-in + 1000ms hold so the user
+      reads the prompt before anything happens).
+    • blinking block cursor at end of the command line (always on)
+    • terminal PROGRESS BAR on a NEW LINE below: `[########....] 47%`.
+      Appears 500ms AFTER typing completes (simulates "enter pressed ->
+      a beat -> processing starts"). Fills 0->92% over ~4.5s with an
+      ease-out curve (feels like it's making real progress), then snaps
+      to 100% on dismiss before the overlay lifts. The percentage number
+      mirrors the bar's actual rendered width via rAF, written directly
+      to the DOM so it stays in perfect lockstep with the bar, including
+      the rapid 92->100% dismiss snap.
+
+  No output line is printed — the hero section IS the output. That's
+  the metaphor: `whoami` → the answer is your name, scrambled in.
+
+  ── CRITICAL: CSS-driven, not JS-driven ──────────────────────────────
+  The fade-in, typing, and bar fill are ALL pure CSS animations. They
+  play on the static HTML at FIRST PAINT — before any script executes.
+  This is essential: if these were driven by JS (setTimeout + DOM
+  writes), they would only start AFTER the script loads. By moving
+  everything to CSS keyframes, the typing happens DURING loading, as
+  intended.
+
+  The percentage number is the ONE JS-driven piece — it mirrors the
+  bar's actual width via rAF, written DIRECTLY to the DOM. Before JS
+  loads, the bar still fills (CSS); the number just reads "  0%" until
+  the rAF catches up.
+
+  JavaScript's jobs:
+    1. rAF percentage mirror (reads the bar fill's clientWidth each
+       frame, writes the percentage directly to the text node).
+    2. dismiss lifecycle:
+          mount -> [CSS: fade-in -> hold -> type -> post-type hold -> bar fills]
+                -> ready signal = max(window.load, 2.2s floor, 5s timeout)
+                -> 200ms hold ("command done")
+                -> dismiss: freeze bar width inline, add `.dismissing` class
+                  -> bar snaps to 100% (CSS), overlay lifts (CSS `loader-lift`)
+                -> dispatch `loader:dismiss` CustomEvent (hero fades in, name scrambles)
+                -> after animation, remove + drop scroll lock
+
+  ── Web Component lifecycle ──────────────────────────────────────────
+  The element re-connects after every Astro ClientRouter body swap
+  (e.g. navigating project → home), so the loader replays on each
+  arrival at the home page — matching the Next.js behavior where the
+  page component remounts.
+
+  ── Reduced motion ───────────────────────────────────────────────────
+  Handled entirely by `@media (prefers-reduced-motion: reduce)`:
+    • no fade-in (terminal shown immediately, opacity 1)
+    • no holds (the holds only affect typing/bar start, which are skipped)
+    • no typing (full `whoami` shown, max-width: none)
+    • no bar animation (bar hidden — a static full bar adds noise)
+    • no cursor blink (static)
+    • dismiss uses `loader-fade` (opacity only, 300ms) not `loader-lift`
+
+  ── A11y ─────────────────────────────────────────────────────────────
+  `role="dialog"`, `aria-modal="true"`, `aria-label="Loading portfolio"`.
+  `aria-live="polite"` region announces `Loading…` → `Loaded`. Page
+  scroll is locked while visible; restored on dismiss. The bar is
+  `aria-hidden` (decorative — the live region covers status).
+-->
+
+<!-- timing constants (see comments above):
+     FADE_IN 300 · HOLD 1000 · TYPE 30ms/char ×6 = 180
+     TYPE_DELAY = 300+1000 = 1300 · POST_TYPE_HOLD 500
+     BAR_DELAY = 1300+180+500 = 1980 · BAR_FADE 200 · BAR_ANIM 4500
+     BAR_TARGET 92% · BAR_COMPLETE 250 · MIN_FLOOR 2200 · TIMEOUT 5000
+     HOLD_AFTER_READY 200 · DISMISS 500 · DISMISS_REDUCED 300          -->
+<boot-loader>
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label="Loading portfolio"
+    class="loader-overlay fixed inset-0 z-[100] flex items-center justify-center"
+  >
+    <!-- terminal block — flex column so the progress bar sits on its
+         own line below the command line. Left-aligned content, centered
+         as a block on the page. -->
+    <div class="loader-terminal font-mono">
+      <!-- ── line 1: prompt + nbsp + typed command + cursor ─────────
+           inline-flex + align-items center so the prompt, the growing
+           command span, and the cursor all share one vertical center
+           (avoids the inline-block + overflow:hidden baseline-drop bug). -->
+      <div class="loader-cmdline">
+        <!-- prompt -->
+        <span class="loader-prompt">~/mohamed-islam $</span>
+        <!-- non-breaking space between prompt and command — guaranteed
+             non-collapsing so the gap reads clearly as
+             `~/mohamed-islam $ whoami`, never `$whoami`. -->
+        <span class="loader-space">&nbsp;</span>
+        <!-- typed command — CSS reveals it char-by-char via max-width.
+             HTML renders the full "whoami"; CSS clips to 0 then steps
+             through 1ch at a time. -->
+        <span class="loader-command">whoami</span>
+        <!-- blinking block cursor — always on, sits right after the
+             last revealed char. As the command's max-width grows, the
+             cursor is pushed right (follows the typing). -->
+        <span class="loader-cursor" aria-hidden></span>
+      </div>
+
+      <!-- ── line 2: terminal progress bar (appears after typing + hold) ─
+           `[########..........] 47%` style. The bar fill animates 0->92%
+           via CSS (plays at first paint), then snaps to 100% on dismiss.
+           Track is fixed-width (20ch). -->
+      <div class="loader-progress" aria-hidden="true">
+        <span class="loader-bar-bracket">[</span>
+        <div class="loader-bar-track">
+          <div class="loader-bar-fill"></div>
+          <!-- empty-cell texture (visible in the unfilled portion) -->
+          <div class="loader-bar-empty"></div>
+        </div>
+        <span class="loader-bar-bracket">]</span>
+        <!-- the percentage text node — written directly by the rAF loop.
+             Initial content is a 3-nbsp pad + "%" so the layout is stable
+             before JS loads (bar fills via CSS even before the script
+             runs; the number just reads "  0%" until the rAF catches up). -->
+        <span class="loader-bar-pct">&nbsp;&nbsp;&nbsp;%</span>
+      </div>
+    </div>
+
+    <!-- sr-only live region — announces state to screen readers.
+         Coarse "Loading..." / "Loaded" — the precise percentage would be
+         announced too frequently and read as noise for SR users. -->
+    <span class="sr-only" aria-live="polite" data-live>Loading portfolio</span>
+  </div>
+</boot-loader>
+
+<script>
+  class BootLoader extends HTMLElement {
+    private timers: ReturnType<typeof setTimeout>[] = [];
+    private raf: number | null = null;
+    private readyAt: number | null = null;
+    private mountedAt = 0;
+    private dismissed = false;
+
+    private later(ms: number, fn: () => void) {
+      const id = setTimeout(fn, ms);
+      this.timers.push(id);
+      return id;
+    }
+
+    connectedCallback() {
+      this.mountedAt = performance.now();
+      this.dismissed = false;
+
+      // lock page scroll while loader is visible. Use a CSS class with
+      // !important on <html> (not inline style on <body>) because:
+      //   1. Lenis manages inline overflow on <html> — an inline style
+      //      on <body> gets clobbered or doesn't take effect.
+      //   2. !important on a class beats both CSS rules and inline styles
+      //      without !important, so it's resilient to Lenis's manipulation.
+      document.documentElement.classList.add("loader-scroll-lock");
+
+      const overlay = this.querySelector<HTMLElement>(".loader-overlay");
+      const fill = this.querySelector<HTMLElement>(".loader-bar-fill");
+      const track = this.querySelector<HTMLElement>(".loader-bar-track");
+      const pctEl = this.querySelector<HTMLElement>(".loader-bar-pct");
+      const live = this.querySelector<HTMLElement>("[data-live]");
+
+      // ── percentage mirror (direct DOM write) ─────────────────────────
+      // rAF loop reads the bar fill's actual rendered width (driven by the
+      // CSS animation) and writes the percentage directly to the DOM node's
+      // textContent. The number and the bar are updated in the SAME rAF
+      // callback, so they're always in lockstep — including during the
+      // rapid 92->100% dismiss snap.
+      // The number is right-padded with nbsp to 3 chars so the `%` doesn't
+      // shift as the digit count grows (1 -> 3). tabular-nums (set in CSS)
+      // keeps digit widths equal.
+      let lastPct = -1;
+      const tickPct = () => {
+        if (fill && track && pctEl && track.clientWidth > 0) {
+          // use clientWidth (layout, no forced reflow from
+          // getBoundingClientRect) — cheaper and integer-snapped.
+          const ratio = fill.clientWidth / track.clientWidth;
+          const newPct = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+          if (newPct !== lastPct) {
+            lastPct = newPct;
+            // pad to 3 chars with nbsp so the layout is stable across
+            // 1-digit, 2-digit, and 3-digit numbers.
+            pctEl.textContent = `${String(newPct).padStart(3, "\u00A0")}%`;
+          }
+        }
+        this.raf = requestAnimationFrame(tickPct);
+      };
+      this.raf = requestAnimationFrame(tickPct);
+
+      this.scheduleReady(overlay, fill, live);
+    }
+
+    // ── ready signal: window.load OR 5s timeout, gated by 2.2s floor ─
+    private scheduleReady(
+      overlay: HTMLElement | null,
+      fill: HTMLElement | null,
+      live: HTMLElement | null,
+    ) {
+      const fireReady = () => {
+        if (this.readyAt !== null || this.dismissed) return;
+        this.readyAt = performance.now();
+        const elapsed = this.readyAt - this.mountedAt;
+        const remaining = Math.max(0, 2200 - elapsed); // MIN_FLOOR_MS
+        // hold for 200ms after the floor ("command done"), then dismiss
+        this.later(remaining + 200, () => this.dismiss(overlay, fill, live));
+      };
+
+      // window.load — fires when all assets (incl. portrait <img>) are done.
+      // NOTE: on SPA re-entries readyState is already "complete", so the
+      // 2.2s floor becomes the effective gate (parity with the Next.js
+      // remount behavior).
+      if (document.readyState === "complete") {
+        fireReady();
+      } else {
+        window.addEventListener("load", fireReady, { once: true });
+        // safety net — never hang forever if load never fires
+        this.later(5000, fireReady); // TIMEOUT_MS
+      }
+    }
+
+    private dismiss(
+      overlay: HTMLElement | null,
+      fill: HTMLElement | null,
+      live: HTMLElement | null,
+    ) {
+      if (this.dismissed) return;
+      this.dismissed = true;
+
+      // Freeze the bar's current width as an inline style BEFORE swapping
+      // to the complete animation. When the CSS `animation` property
+      // changes, the browser can flash the element's base style
+      // (width: 0%) for one frame before the new animation's implicit
+      // `from` kicks in. Setting the current width inline gives the
+      // new animation a stable starting point — no flash to 0.
+      if (fill) {
+        const w = getComputedStyle(fill).width;
+        fill.style.width = w;
+      }
+      overlay?.classList.add("dismissing");
+      overlay?.style.setProperty("pointer-events", "none");
+      if (live) live.textContent = "Loaded";
+      // tell the hero to start the name scramble (with its own 150ms delay)
+      window.dispatchEvent(new CustomEvent("loader:dismiss"));
+      // read reduced-motion preference directly so the removal timing
+      // matches the CSS dismiss animation duration.
+      const isReduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      this.later(isReduced ? 300 : 500, () => {
+        document.documentElement.classList.remove("loader-scroll-lock");
+        this.remove();
+      });
+    }
+
+    disconnectedCallback() {
+      document.documentElement.classList.remove("loader-scroll-lock");
+      this.timers.forEach(clearTimeout);
+      this.timers = [];
+      if (this.raf !== null) cancelAnimationFrame(this.raf);
+      this.raf = null;
+    }
+  }
+
+  customElements.define("boot-loader", BootLoader);
+</script>
+
+<style>
+  .loader-terminal {
+    font-size: clamp(0.95rem, 2.4vw, 1.3rem);
+    letter-spacing: 0.04em;
+    color: var(--ink);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35em;
+    /* slight glow to lift it off the dot field */
+    text-shadow: 0 0 24px rgba(0, 0, 0, 0.4);
+    animation: loader-terminal-in 300ms var(--ease) both; /* FADE_IN_MS */
+  }
+
+  /* ── terminal fade-in: opacity + blur ───────────────────────── */
+  @keyframes loader-terminal-in {
+    from {
+      opacity: 0;
+      filter: blur(4px);
+    }
+    to {
+      opacity: 1;
+      filter: blur(0);
+    }
+  }
+
+  /* ── typing: reveal "whoami" char-by-char via max-width ──────
+     steps(6) quantizes 0→6ch into 6 one-ch jumps, one per char.
+     Monospace so 1ch == one glyph advance. Delayed by
+     FADE_IN_MS + HOLD_MS so the prompt is visible alone first. */
+  @keyframes loader-type {
+    from {
+      max-width: 0;
+    }
+    to {
+      max-width: 6ch;
+    }
+  }
+
+  /* ── bar fill: 0→92% over 4.5s, ease-out (creeps) ────
+     cubic-bezier front-loads then slows — feels like real load
+     progress. Capped at 92% so it never looks "done" until the
+     dismiss snap to 100%. */
+  @keyframes loader-bar-fill {
+    from {
+      width: 0%;
+    }
+    to {
+      width: 92%;
+    }
+  }
+
+  /* ── bar complete: snap to 100% on dismiss (implicit from =
+     current width, so it smoothly continues from wherever the
+     fill animation left off). */
+  @keyframes loader-bar-complete {
+    to {
+      width: 100%;
+    }
+  }
+
+  /* ── bar container fade-in (after typing) ──────────────────── */
+  @keyframes bar-fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* ── cursor blink ──────────────────────────────────────────── */
+  @keyframes loader-blink {
+    0%,
+    49% {
+      opacity: 1;
+    }
+    50%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* ── dismiss: lift + fade (normal motion) ──────────────────── */
+  @keyframes loader-lift {
+    from {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-16px);
+    }
+  }
+  /* ── dismiss: fade only (reduced motion) ──────────────────── */
+  @keyframes loader-fade {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  .loader-cmdline {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .loader-prompt {
+    color: var(--ink-dim);
+  }
+  .loader-space {
+    color: var(--ink-dim);
+  }
+
+  .loader-command {
+    display: inline-block;
+    overflow: hidden;
+    white-space: nowrap;
+    /* start clipped so nothing shows before the delay */
+    max-width: 0;
+    color: var(--ink);
+    /* steps(6) → 6 one-ch jumps over 180ms, starting after
+       fade-in + hold (1300ms in). */
+    animation: loader-type 180ms steps(6) 1300ms both;
+  }
+
+  .loader-cursor {
+    display: inline-block;
+    width: 0.6ch;
+    height: 1.1em;
+    margin-left: 0.15em;
+    background: var(--ink);
+    animation: loader-blink 1s steps(2) infinite;
+  }
+
+  /* ── progress bar ────────────────────────────────────────────
+     inline-flex so brackets + track + pct all share one line and
+     one baseline. Track is fixed-width in ch (monospace) so it
+     scales with the font. Fill is absolutely positioned inside
+     the track and animates width via CSS. Empty texture shows
+     through the unfilled portion via the .loader-bar-empty
+     sibling (dotted pattern). */
+  .loader-progress {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2ch;
+    opacity: 0;
+    animation: bar-fade-in 200ms var(--ease) 1980ms both; /* BAR_FADE_MS @ BAR_DELAY_MS */
+  }
+  .loader-bar-bracket {
+    color: var(--ink-dim);
+    font-weight: 400;
+  }
+  .loader-bar-track {
+    position: relative;
+    width: 20ch;
+    height: 1em;
+    overflow: hidden;
+    /* hairline top/bottom rails so the bar reads as a defined
+       cell even when empty */
+    box-shadow:
+      inset 0 1px 0 var(--line),
+      inset 0 -1px 0 var(--line);
+  }
+  /* empty-cell dotted texture — sits under the fill, shows
+     through in the unfilled portion. Faint so the filled portion
+     (solid ink) reads as "active". */
+  .loader-bar-empty {
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--ink-faint) 0,
+      var(--ink-faint) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .loader-bar-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 0%;
+    /* solid ink with thin block-segment gaps (show the empty
+       texture through the gaps -> reads as discrete blocks
+       instead of a solid slab). */
+    background-color: var(--ink);
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 7px,
+      var(--bg) 7px,
+      var(--bg) 9px
+    );
+    /* ease-out that keeps creeping toward 92% (front-loads but
+       never quite stalls) — feels like real load progress. */
+    animation: loader-bar-fill 4500ms cubic-bezier(0.22, 0.61, 0.36, 1) 1980ms both;
+  }
+  .loader-bar-pct {
+    display: inline-block;
+    min-width: 4ch;
+    text-align: right;
+    color: var(--ink-muted);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  /* on dismiss: snap bar to 100% (implicit from = current width),
+     then the overlay lifts. Both run concurrently; the bar hits
+     100% mid-lift (feels like "load complete → exit"). */
+  .loader-overlay.dismissing .loader-bar-fill {
+    animation: loader-bar-complete 250ms var(--ease) forwards;
+  }
+  .loader-overlay.dismissing {
+    animation: loader-lift 500ms var(--ease) forwards;
+  }
+
+  /* ── reduced motion: show full terminal instantly, no bar,
+     no blink, no typing. dismiss = simple fade. ─────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    .loader-terminal {
+      animation: none !important;
+      opacity: 1 !important;
+      filter: none !important;
+    }
+    .loader-command {
+      animation: none !important;
+      max-width: none !important;
+    }
+    .loader-progress {
+      display: none !important;
+    }
+    .loader-cursor {
+      animation: none !important;
+      opacity: 1 !important;
+    }
+    .loader-overlay.dismissing {
+      animation: loader-fade 300ms var(--ease) forwards !important;
+    }
+  }
+</style>
