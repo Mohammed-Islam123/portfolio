@@ -1,0 +1,35 @@
+---
+/**
+ * UiIcon — one consistent Lucide-style stroke icon set (replaces the
+ * mixed unicode glyphs). 24×24 viewBox, currentColor stroke, 2px width.
+ * simple-icons remain the only filled/brand icons (TechIcon/SocialIcon).
+ */
+import { UI_ICONS } from "../../lib/icons";
+
+interface Props {
+  name: string;
+  size?: number;
+  class?: string;
+}
+
+const { name, size = 16, class: className } = Astro.props;
+const inner = UI_ICONS[name];
+---
+
+{
+  inner && (
+    <svg
+      class={className}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      aria-hidden="true"
+      set:html={inner}
+    />
+  )
+}

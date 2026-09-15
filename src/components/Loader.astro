@@ -1,0 +1,325 @@
+---
+interface Props {
+  mode?: "home" | "article" | "generic";
+  slug?: string;
+}
+
+const { mode = "generic", slug } = Astro.props;
+const command =
+  mode === "home"
+    ? { prompt: "~/mohamed-islam $", text: "whoami" }
+    : mode === "article" && slug
+      ? { prompt: "~/blog $", text: `cat ${slug}.md` }
+      : null;
+const typeDuration = command
+  ? mode === "home"
+    ? 760
+    : Math.max(500, command.text.length * 15)
+  : 0;
+---
+
+<noscript><style>.loader-overlay{display:none}</style></noscript>
+<boot-loader data-mode={mode} data-command={command?.text} data-type-duration={typeDuration}>
+  <div
+    class="loader-overlay"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Loading portfolio"
+  >
+    <div class="loader-terminal">
+      {command && (
+        <div class="loader-command-line">
+          <span class="loader-prompt">{command.prompt}</span>
+          <span>&nbsp;</span>
+          <span class="loader-command">
+            {command.text}
+          </span>
+          <span class="loader-cursor" aria-hidden="true"></span>
+        </div>
+      )}
+      <p class="loader-status">
+        <span>loading</span><span class="loader-dots" aria-hidden="true">…</span>
+      </p>
+    </div>
+    <span class="sr-only" aria-live="polite" data-live>Loading portfolio</span>
+  </div>
+</boot-loader>
+
+<script>
+  const MINIMUM_VISIBLE_DURATION = 2000;
+  let activeLoader: BootLoader | undefined;
+
+  class BootLoader extends HTMLElement {
+    private timers: number[] = [];
+    private onLoad?: () => void;
+    private onPageLoad?: () => void;
+    private animationFrame?: number;
+    private ready = false;
+    private typed = false;
+    private dismissed = false;
+    private mountedAt = 0;
+
+    private later(delay: number, action: () => void) {
+      const timer = window.setTimeout(action, delay);
+      this.timers.push(timer);
+    }
+
+    connectedCallback() {
+      // A fresh loader is mounted after every Astro client-side swap. Keep
+      // one active owner so an outgoing element cannot release the incoming
+      // loader's scroll lock during a body replacement.
+      activeLoader?.cancel();
+      activeLoader = this;
+
+      this.mountedAt = performance.now();
+      document.documentElement.dataset.loaderState = "loading";
+      document.documentElement.classList.add("loader-scroll-lock");
+      window.dispatchEvent(
+        new CustomEvent("loader:statechange", { detail: { state: "loading" } }),
+      );
+
+      const isGeneric = this.dataset.mode === "generic";
+      const typeDuration = Number(this.dataset.typeDuration ?? 0);
+      if (isGeneric || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        this.markCommandComplete();
+      } else {
+        this.typeCommand(this.dataset.command ?? "", typeDuration);
+      }
+
+      const isClientNavigation =
+        document.documentElement.dataset.clientNavigation === "true";
+      if (isClientNavigation) {
+        // ClientRouter has fetched and swapped the new document, but the
+        // incoming page has not finished its own lifecycle yet. Keep the
+        // overlay active through Astro's completion signal.
+        this.onPageLoad = () => {
+          this.ready = true;
+          this.dismissWhenReady();
+        };
+        document.addEventListener("astro:page-load", this.onPageLoad, {
+          once: true,
+        });
+        this.later(5000, () => {
+          this.ready = true;
+          this.dismissWhenReady();
+        });
+      } else if (document.readyState === "complete") {
+        this.ready = true;
+      } else {
+        this.onLoad = () => {
+          this.ready = true;
+          this.dismissWhenReady();
+        };
+        window.addEventListener("load", this.onLoad, { once: true });
+        this.later(5000, () => {
+          this.ready = true;
+          this.dismissWhenReady();
+        });
+      }
+      this.dismissWhenReady();
+    }
+
+    private dismissWhenReady() {
+      if (this.dismissed || !this.ready || !this.typed) return;
+      const elapsed = performance.now() - this.mountedAt;
+      this.later(
+        Math.max(0, MINIMUM_VISIBLE_DURATION - elapsed),
+        () => this.dismiss(),
+      );
+    }
+
+    private markCommandComplete() {
+      this.typed = true;
+      this.setAttribute("data-command-complete", "");
+      this.dismissWhenReady();
+    }
+
+    private typeCommand(command: string, duration: number) {
+      const commandEl = this.querySelector<HTMLElement>(".loader-command");
+      if (!commandEl || !command) {
+        this.markCommandComplete();
+        return;
+      }
+
+      commandEl.textContent = "";
+      this.setAttribute("data-command-hydrated", "");
+      const characters = Array.from(command);
+      // Give each character a slightly different dwell time. The timer is
+      // anchored to the first rendered frame, not to component setup: first
+      // load can be busy parsing scripts and painting the page.
+      const weights = characters.map((character, index) => {
+        if (/\s/.test(character)) return 0.55;
+        if (index === characters.length - 1) return 1.2;
+        return 0.8 + ((index * 17) % 5) * 0.1;
+      });
+      const weightTotal = weights.reduce((total, weight) => total + weight, 0);
+      const characterDelays = weights.map(
+        (weight) => (duration * weight) / weightTotal,
+      );
+      let index = 0;
+      let nextCharacterAt = 0;
+      const typeNext = (now: number) => {
+        if (this.dismissed) return;
+        if (!nextCharacterAt) {
+          nextCharacterAt = now + (characterDelays[index] ?? 0);
+        }
+
+        // Reveal no more than one character in a frame. If the main thread
+        // is delayed on first load, the animation slows briefly instead of
+        // jumping forward by several characters to catch up.
+        if (now >= nextCharacterAt) {
+          commandEl.textContent += characters[index] ?? "";
+          index += 1;
+          nextCharacterAt = now + (characterDelays[index] ?? 0);
+        }
+        if (index < characters.length) {
+          this.animationFrame = requestAnimationFrame(typeNext);
+        } else {
+          this.animationFrame = undefined;
+          this.markCommandComplete();
+        }
+      };
+      this.later(120, () => {
+        this.animationFrame = requestAnimationFrame(typeNext);
+      });
+    }
+
+    private cancel() {
+      if (this.dismissed) return;
+      this.dismissed = true;
+      this.timers.forEach(window.clearTimeout);
+      this.timers = [];
+      if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+      if (this.onLoad) window.removeEventListener("load", this.onLoad);
+      if (this.onPageLoad)
+        document.removeEventListener("astro:page-load", this.onPageLoad);
+    }
+
+    private dismiss() {
+      if (this.dismissed) return;
+      this.dismissed = true;
+      document.documentElement.dataset.loaderState = "dismissed";
+      this.querySelector<HTMLElement>(".loader-overlay")?.classList.add("is-dismissing");
+      window.dispatchEvent(new CustomEvent("loader:dismiss"));
+      window.dispatchEvent(
+        new CustomEvent("loader:statechange", { detail: { state: "dismissed" } }),
+      );
+      const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 160 : 420;
+      this.later(duration, () => {
+        if (activeLoader === this) {
+          activeLoader = undefined;
+          document.documentElement.classList.remove("loader-scroll-lock");
+        }
+        this.remove();
+      });
+    }
+
+    disconnectedCallback() {
+      this.timers.forEach(window.clearTimeout);
+      this.timers = [];
+      if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
+      if (this.onLoad) window.removeEventListener("load", this.onLoad);
+      if (this.onPageLoad)
+        document.removeEventListener("astro:page-load", this.onPageLoad);
+      if (activeLoader === this) {
+        activeLoader = undefined;
+        document.documentElement.classList.remove("loader-scroll-lock");
+      }
+    }
+  }
+
+  if (!customElements.get("boot-loader")) {
+    customElements.define("boot-loader", BootLoader);
+  }
+</script>
+
+<style>
+  .loader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    place-items: center;
+    background: var(--bg);
+    color: var(--ink);
+    transition: opacity 420ms var(--ease), transform 420ms var(--ease);
+  }
+
+  .loader-terminal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: min(28rem, calc(100vw - 3rem));
+    font-family: var(--font-mono);
+    font-size: clamp(0.9rem, 2.4vw, 1.2rem);
+    letter-spacing: 0.03em;
+  }
+
+  .loader-command-line,
+  .loader-status {
+    display: flex;
+    align-items: center;
+    margin: 0;
+  }
+
+  .loader-prompt,
+  .loader-status { color: var(--ink-dim); }
+
+  .loader-status {
+    opacity: 0;
+    transform: translateY(0.25rem);
+  }
+
+  boot-loader[data-mode="generic"] .loader-status,
+  boot-loader[data-command-complete] .loader-status {
+    animation: loader-status-in 180ms var(--ease) both;
+  }
+
+  .loader-command {
+    display: inline-block;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+
+  boot-loader:not([data-command-hydrated]) .loader-command {
+    visibility: hidden;
+  }
+
+  .loader-cursor {
+    width: 0.55ch;
+    height: 1.05em;
+    margin-left: 0.2ch;
+    background: var(--ink);
+    animation: loader-cursor 1s steps(2) infinite;
+  }
+
+  .loader-dots {
+    display: inline-block;
+    min-width: 1ch;
+    animation: loader-dots 1.2s steps(2, end) infinite;
+  }
+
+  .loader-overlay.is-dismissing {
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-0.75rem);
+  }
+
+  @keyframes loader-cursor {
+    50% { opacity: 0; }
+  }
+
+  @keyframes loader-dots {
+    50% { opacity: 0.35; }
+  }
+
+  @keyframes loader-status-in {
+    to { opacity: 1; transform: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loader-command { visibility: visible !important; }
+    .loader-cursor, .loader-dots { animation: none; }
+    .loader-overlay { transition-duration: 160ms; }
+  }
+</style>

@@ -1,0 +1,121 @@
+---
+import { siteConfig } from "../config/site";
+---
+
+<!--
+  ScrambleName — the hero name scrambles in on demand, driven by the
+  same Scrambler engine as the greeting.
+
+  ── Trigger ─────────────────────────────────────────────────────────
+  Listens for the `loader:dismiss` CustomEvent on `window`, dispatched
+  by <boot-loader> when the loading overlay begins its lift-off
+  animation. There's a 150ms overlap: the loader is leaving *as* the
+  name resolves — the loader is the prompt, the name is the answer.
+
+  ── Reduced motion ─────────────────────────────────────────────────
+  No scramble — name appears statically with the 460ms greet-in fade
+  (same fallback the greeting uses), still gated on loader:dismiss so
+  the timing matches.
+
+  ── Static render ───────────────────────────────────────────────────
+  The build renders empty ("") so the name is invisible until the
+  loader dismisses — intentional: the loader hides the empty state.
+-->
+<scramble-name
+  class="inline-block text-[var(--ink)]"
+  style="min-width: 1em;"
+  role="text"
+  aria-label={siteConfig.name}
+>
+  <span class="sn-text"></span>
+  <noscript><span class="sn-text">{siteConfig.name}</span></noscript>
+  <span class="sr-only sn-live" aria-live="polite"></span>
+</scramble-name>
+
+<script>
+  import { siteConfig } from "../config/site";
+  import { Scrambler } from "../lib/scrambler";
+
+  const FULL_NAME = siteConfig.name;
+
+  class ScrambleNameEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      const textEl = this.querySelector<HTMLElement>(".sn-text");
+      const liveEl = this.querySelector<HTMLElement>(".sn-live");
+      if (!textEl || !liveEl) return;
+
+      const isReduced = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      const isClientNavigation =
+        document.documentElement.dataset.loaderState === "dismissed";
+
+      if (isClientNavigation) {
+        textEl.textContent = FULL_NAME;
+        this.style.minWidth = "";
+        liveEl.textContent = FULL_NAME;
+        return;
+      }
+
+      // reduced motion — show name statically with a fade. We still
+      // wait for the loader:dismiss signal so the timing matches the
+      // non-reduced path (loader visible → name appears).
+      if (isReduced) {
+        const onDismiss = () => {
+          textEl.textContent = FULL_NAME;
+          textEl.style.animation = "greet-in 460ms var(--ease) both";
+          this.style.minWidth = "";
+          liveEl.textContent = FULL_NAME;
+        };
+        if (document.documentElement.dataset.loaderState === "dismissed") onDismiss();
+        else window.addEventListener("loader:dismiss", onDismiss, { once: true });
+        const safety = setTimeout(onDismiss, 6000);
+        this.cleanupFns.push(() => {
+          window.removeEventListener("loader:dismiss", onDismiss);
+          clearTimeout(safety);
+        });
+        return;
+      }
+
+      const scrambler = new Scrambler(
+        (t) => {
+          textEl.textContent = t;
+        },
+        () => {
+          this.style.minWidth = "";
+          liveEl.textContent = FULL_NAME;
+        },
+      );
+
+      let started = false;
+      const onDismiss = () => {
+        if (started) return;
+        started = true;
+        // 150ms delay so the loader has begun lifting before the
+        // scramble starts — the handoff feels continuous.
+        setTimeout(() => {
+          scrambler.start("", FULL_NAME);
+        }, 150);
+      };
+
+      if (document.documentElement.dataset.loaderState === "dismissed") onDismiss();
+      else window.addEventListener("loader:dismiss", onDismiss, { once: true });
+      const safety = setTimeout(onDismiss, 6000);
+
+      this.cleanupFns.push(() => {
+        window.removeEventListener("loader:dismiss", onDismiss);
+        clearTimeout(safety);
+        scrambler.cancel();
+      });
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("scramble-name", ScrambleNameEl);
+</script>

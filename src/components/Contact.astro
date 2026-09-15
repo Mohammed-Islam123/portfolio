@@ -1,0 +1,171 @@
+---
+/**
+ * Contact — closing CTA + footer bar.
+ *  - a single, smaller closing line (no long description, no email button —
+ *    the social icons ARE the call to action, omkartalwalkar.com-style)
+ *  - centered row of circular social icon buttons (github · linkedin ·
+ *    whatsapp · email) directly beneath the line
+ *  - AmbientSignal shader behind (calm flowing lines)
+ *  - footer bar: sound toggle LED + copyright + built-with
+ *
+ * The footer year renders the build year at build time and is updated
+ * live by a tiny inline script (data-astro-rerun so it also re-applies
+ * after SPA navigations).
+ */
+import { siteConfig } from "../config/site";
+import SectionLabel from "./primitives/SectionLabel.astro";
+import Reveal from "./primitives/Reveal.astro";
+import AmbientSignal from "./AmbientSignal.astro";
+import SocialIcon from "./icons/SocialIcon.astro";
+
+const buildYear = new Date().getFullYear();
+---
+
+<footer
+  id="contact"
+  class="relative mt-auto overflow-hidden border-t border-[var(--line-soft)] bg-[var(--bg)]"
+>
+  <!-- ambient shader -->
+  <AmbientSignal class="opacity-70" />
+
+  <div class="relative wrap py-[clamp(5rem,14vh,9rem)]">
+    <Reveal>
+      <SectionLabel>contact</SectionLabel>
+    </Reveal>
+
+    <!-- ── CTA ───────────────────────────────────────────────────
+         omkartalwalkar.com-inspired: a single closing line (kept
+         deliberately small so it reads as a quiet sign-off, not a
+         shout), then a centered row of social icon buttons directly
+         beneath it. No separate email button — the envelope icon in
+         the row covers it. -->
+    <Reveal delay={80}>
+      <div class="mt-10 flex flex-col items-center text-center">
+        <p
+          class="font-display font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--ink)]"
+          style="font-size: clamp(1.6rem, 5vw, 3.25rem);"
+        >
+          if you've made it this far,
+          <span class="font-light text-[var(--ink-soft)]">say hi</span>.
+        </p>
+
+        <!-- social icon row — centered, the call to action itself -->
+        <div class="mt-10 flex items-center justify-center gap-3">
+          {
+            siteConfig.socials.map((s) => (
+              <a
+                href={s.href}
+                target={s.href.startsWith("http") ? "_blank" : undefined}
+                rel={s.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                data-sound-hover
+                data-sound-click
+                aria-label={s.label}
+                title={s.label}
+                class="group/soc relative flex h-12 w-12 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-[color,border-color,background-color,transform,box-shadow] [transition-duration:var(--transition)] hover:-translate-y-0.5 hover:border-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] hover:shadow-[0_10px_30px_-12px_rgba(255,255,255,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+              >
+                <SocialIcon name={s.icon} size={18} />
+                <!-- hover sheen — a faint top highlight that blooms on hover -->
+                <span
+                  aria-hidden="true"
+                  class="pointer-events-none absolute inset-0 rounded-full opacity-0 transition-opacity [transition-duration:var(--transition)] group-hover/soc:opacity-100"
+                  style="background: linear-gradient(180deg, rgba(255,255,255,0.10) 0%, transparent 55%);"
+                />
+              </a>
+            ))
+          }
+        </div>
+      </div>
+    </Reveal>
+  </div>
+
+  <!-- ── footer bar ──────────────────────────────────────────── -->
+  <div class="relative border-t border-[var(--line-soft)]">
+    <div
+      class="wrap flex flex-wrap items-center justify-between gap-3 py-4 font-mono text-xs text-[var(--ink-dim)]"
+    >
+      <div class="flex items-center gap-2">
+        <span class="text-[var(--ink-muted)]">©</span>
+        <span><span data-year>{buildYear}</span> {siteConfig.fullName}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <sound-toggle>
+          <span class="st-label sound-off" hidden>
+            <span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--ink-dim)]"></span>
+            sound · off
+          </span>
+          <button type="button" class="st-btn hidden items-center gap-2 transition-colors hover:text-[var(--ink)]">
+            <span class="st-led inline-block h-1.5 w-1.5 rounded-full transition-[background-color,box-shadow] [transition-duration:var(--transition)]"></span>
+            <span class="st-text">sound · on</span>
+          </button>
+        </sound-toggle>
+      </div>
+    </div>
+  </div>
+
+  <!-- keep the footer year current in the visitor's year (the static
+       HTML carries the build year as a no-JS fallback) -->
+  <script is:inline data-astro-rerun>
+    (function () {
+      var el = document.querySelector("[data-year]");
+      if (el) el.textContent = String(new Date().getFullYear());
+    })();
+  </script>
+</footer>
+
+<script>
+  import {
+    isSoundOn,
+    isSoundCapableNow,
+    toggleSound,
+    playSound,
+    SOUND_SYNC_EVENT,
+  } from "../scripts/sound-init";
+
+  class SoundToggleEl extends HTMLElement {
+    connectedCallback() {
+      const disabled = this.querySelector<HTMLElement>(".sound-off");
+      const btn = this.querySelector<HTMLButtonElement>(".st-btn");
+      const led = this.querySelector<HTMLElement>(".st-led");
+      const text = this.querySelector<HTMLElement>(".st-text");
+      if (!disabled || !btn || !led || !text) return;
+
+      if (!isSoundCapableNow()) {
+        disabled.hidden = false;
+        return;
+      }
+      btn.hidden = false;
+      btn.classList.remove("hidden");
+      btn.classList.add("flex");
+
+      const render = () => {
+        const on = isSoundOn();
+        btn.setAttribute("aria-pressed", String(on));
+        btn.setAttribute("aria-label", on ? "turn sound off" : "turn sound on");
+        led.className = `st-led inline-block h-1.5 w-1.5 rounded-full transition-[background-color,box-shadow] [transition-duration:var(--transition)] ${
+          on
+            ? "bg-[var(--ink)] shadow-[0_0_6px_rgba(255,255,255,0.4)]"
+            : "bg-[var(--ink-dim)]"
+        }`;
+        text.textContent = `sound · ${on ? "on" : "off"}`;
+      };
+      render();
+
+      btn.addEventListener("click", () => {
+        toggleSound();
+      });
+      // stay in sync with other toggles in the tab
+      window.addEventListener(SOUND_SYNC_EVENT, render);
+
+      // social buttons — hover/click sounds (delegated within the footer)
+      const footer = this.closest("footer");
+      footer?.querySelectorAll("[data-sound-hover]").forEach((el) =>
+        el.addEventListener("mouseenter", () => playSound("hover")),
+      );
+      footer?.querySelectorAll("[data-sound-click]").forEach((el) =>
+        el.addEventListener("click", () => playSound("click")),
+      );
+    }
+  }
+
+  customElements.define("sound-toggle", SoundToggleEl);
+</script>

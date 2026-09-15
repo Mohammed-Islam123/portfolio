@@ -1,0 +1,404 @@
+---
+/**
+ * Hero — centered portrait with a bottom fade mask, a dot field behind,
+ * and the greeting text rising out of the portrait's faded bottom.
+ *
+ *  Line 1 : 👋 hello   (waving hand instead of "//")
+ *  Line 2 : "I am Mohamed Islam Benyahkem."  — "I am" light/dim, name
+ *           scrambles in via <scramble-name>
+ *  Line 3 : role keywords (static)
+ *  Line 4 : [download cv] [contact] buttons
+ *
+ *  ── Reveal coordination ────────────────────────────────────────────
+ *  All entrance animations (hero-fade) are GATED on the loader:dismiss
+ *  event (with a 2.5s safety timeout). Without this gate, the fades
+ *  would play while the loader is hiding the hero — by the time the
+ *  loader lifts, the fades would be done and the hero would just
+ *  "appear" with no motion.
+ *
+ *  With the gate: loader lifts → hero fades in → name scrambles in.
+ *  The "I am" kicker leads the scramble (0ms delay, 200ms duration),
+ *  scramble starts 150ms after loader:dismiss (see ScrambleName).
+ *
+ *  ── Live clock (top-left) + "open to work" pill (top-right) ────────
+ *  Both live INSIDE the hero and the hero carries
+ *  `transform: translateZ(0)`. That transform establishes a containing
+ *  block for `position: fixed`, so the clock AND the status pill behave
+ *  exactly like gorix.zip's chrome: they stay pinned to the viewport
+ *  while the hero is in view, then scroll away with the hero once you
+ *  pass it (instead of lingering forever like true fixed elements).
+ */
+import { siteConfig } from "../config/site";
+import DotField from "./DotField.astro";
+import Greeting from "./Greeting.astro";
+import ScrambleName from "./ScrambleName.astro";
+---
+
+<hero-section
+  id="top"
+  class="hero-root relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden pt-[var(--nav-h)]"
+  data-timezone={siteConfig.timezone}
+  style="transform: translateZ(0); display: flex;"
+>
+  <!-- shader background -->
+  <DotField />
+
+  <!-- ── live clock (top-left, scrolls with hero, lg+) ────────────
+       VISIBLE FROM FRAME 1 — not gated on the loader. The clock is
+       "system info" and feels right that it's there from the start,
+       even while the terminal loader is typing `whoami`. It fades in
+       on load with a short independent animation. -->
+  <div
+    aria-hidden="true"
+    class="nav-haze pointer-events-none fixed left-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2 rounded-full border border-[var(--glass-border)] px-3.5 font-mono text-xs text-[var(--ink-dim)] lg:flex"
+    style="animation: hero-fade 500ms var(--ease) both;"
+  >
+    <span class="hero-clock tabular-nums">--:--:--</span>
+    <span class="text-[var(--ink-faint)]">
+      (gmt{siteConfig.tzOffset} / {siteConfig.tzLabel})
+    </span>
+  </div>
+
+  <!-- ── "open to work" status pill (top-right, scrolls with hero) ─
+       HIDDEN during loading — gated on loader:dismiss. The clock is
+       system info (stays), but the status pill is portfolio chrome and
+       should only appear when the hero does. Mirrors the clock on the
+       left: same top offset + height so it sits on the nav links'
+       horizontal line. lg+ only (matches the clock). -->
+  <div
+    aria-hidden="true"
+    class="hero-gated pointer-events-none fixed right-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2.5 rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3.5 font-mono text-xs text-[var(--ink-muted)] backdrop-blur-md lg:flex hf-500-200"
+    style="box-shadow: var(--glass-inset);"
+  >
+    <span class="relative flex h-2 w-2">
+      <span
+        aria-hidden="true"
+        class="absolute -inset-1.5 rounded-full"
+        style="background: radial-gradient(circle, rgba(255,255,255,0.25) 0%, transparent 70%); animation: status-pulse 2.4s ease-in-out infinite;"
+      ></span>
+      <span
+        class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--ink)] opacity-60"></span>
+      <span
+        class="relative inline-flex h-2 w-2 rounded-full"
+        style="background: var(--ink); box-shadow: 0 0 8px rgba(255,255,255,0.45);"></span>
+    </span>
+    <span class="text-[var(--ink)]">{siteConfig.status.label}</span>
+  </div>
+
+  <!-- portrait + text stack, centered -->
+  <div class="relative z-10 flex flex-col items-center">
+    <!-- ── portrait (placeholder) ──────────────────────────────── -->
+    <div
+      class="hero-gated relative hf-800-0"
+      style="margin-bottom: -2.75rem;"
+    >
+      <!-- soft monochrome glow orb behind portrait -->
+      <div
+        aria-hidden="true"
+        class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[160%] w-[140%]"
+        style="background: radial-gradient(ellipse 45% 40% at 50% 50%, rgba(255,255,255,0.06) 0%, transparent 65%);"
+      >
+      </div>
+
+      <!-- PortraitPlaceholder — a clean stand-in for the real portrait.
+           Bottom fade mask dissolves into the text below. Replace the
+           inner <img> src with a real photo (e.g. /portrait.jpg in
+           /public); the fade mask + sizing stay the same. -->
+      <div
+        class="relative h-[clamp(17rem,40vh,24rem)] w-[clamp(13rem,28vw,19rem)]"
+        style="-webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);"
+        aria-label="portrait — placeholder"
+      >
+        <!-- grayscale by default, blooms to color on hover (.bw-img) -->
+        <div
+          class="group relative h-full w-full overflow-hidden rounded-t-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--surface)]"
+        >
+          <img
+            src="https://i.pravatar.cc/600?img=68"
+            alt="portrait placeholder — replace with your photo"
+            loading="eager"
+            class="h-full w-full object-cover bw-img" />
+          <!-- subtle scrim so the fade-into-text reads on any photo.
+               Uses --scrim-color so it adapts to the active theme. -->
+          <div
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-0"
+            style="background: linear-gradient(to bottom, transparent 40%, rgba(var(--scrim-color), 0.55) 100%);"
+          >
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── greeting text ───────────────────────────────────────── -->
+    <!-- block is centered as a unit. ONLY "I am" left-aligns to the
+         name's left edge (editorial kicker). greeting / role / buttons
+         stay centered. -->
+    <div class="relative z-10 flex flex-col items-center px-6 text-center">
+      <p
+        class="hero-gated font-mono text-[clamp(1.6rem,4.4vw,2.4rem)] tracking-[0.16em] text-[var(--ink-muted)] uppercase hf-700-100"
+      >
+        <Greeting />
+      </p>
+      <h1
+        class="mt-3 flex flex-col items-start font-sans font-semibold leading-[1.0] tracking-[-0.04em] text-[var(--ink)]"
+        style="font-size: clamp(2rem, 7vw, 4.75rem);"
+      >
+        <!-- "I am" kicker — leads the name scramble. 0ms delay so it
+             starts the instant the loader begins lifting; 200ms
+             duration so it's visible before the scramble gets going
+             (scramble starts 150ms after loader:dismiss, runs ~840ms).
+             The reader sees "I am ____" then the name resolves into
+             place — the loader was the question, the name is the
+             answer. -->
+        <span
+          class="hero-gated font-light hf-200-0"
+          style="color: var(--ink-soft); font-size: 0.4em; letter-spacing: 0.06em; margin-bottom: 0.25em;"
+        >
+          I am
+        </span>
+        <!-- name — driven by <scramble-name>, which listens for
+             loader:dismiss and starts the scramble 150ms later.
+             No hero-fade on the name; the scramble IS the entrance.
+             The trailing period stays static (ink-soft). -->
+        <span class="text-[var(--ink)]">
+          <ScrambleName /><span class="text-[var(--ink-soft)]">.</span>
+        </span>
+      </h1>
+      <!-- role keywords — static line -->
+      <p
+        class="hero-gated mt-5 max-w-[42rem] font-mono text-[clamp(0.8rem,1.6vw,0.95rem)] tracking-[0.08em] text-[var(--ink-muted)] hf-800-400"
+      >
+        {siteConfig.roleKeywords}
+      </p>
+
+      <!-- ── action buttons — download cv + contact ─────────────
+          Two buttons, centered. The bottom margin pushes the whole
+          centered column up (the section is justify-center) so there's
+          a comfortable gap between the buttons and the absolute scroll
+          cue at the bottom. -->
+      <div class="hero-gated mt-8 mb-16 flex flex-wrap items-center justify-center gap-3 hf-800-600">
+        <a
+          href={siteConfig.cvUrl}
+          download
+          class="group/cv inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--surface-2)] px-5 py-2.5 font-mono text-xs tracking-[0.06em] text-[var(--ink)] transition-[transform,border-color,background-color] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 hover:border-[var(--ink-muted)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+        >
+          <!-- download icon (lucide "download", inlined) -->
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            class="text-[var(--ink-muted)] transition-transform [transition-duration:var(--transition-fast)] group-hover/cv:translate-y-0.5 group-hover/cv:text-[var(--ink)]"
+          >
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          <span>download cv</span>
+        </a>
+        <a
+          href="#contact"
+          class="group/ct inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-5 py-2.5 font-mono text-xs tracking-[0.06em] text-[var(--bg)] transition-[transform,box-shadow] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+          style="background: var(--ink); box-shadow: 0 6px 20px -8px rgba(255,255,255,0.30);"
+        >
+          <span>contact</span>
+          <!-- arrow-down icon (lucide "arrow-down", inlined) -->
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+            class="transition-transform [transition-duration:var(--transition-fast)] group-hover/ct:translate-y-0.5"
+          >
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <polyline points="19 12 12 19 5 12"></polyline>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- scroll cue -->
+  <div
+    class="hero-gated absolute bottom-10 left-1/2 -translate-x-1/2 font-mono text-xs tracking-[0.32em] text-[var(--ink-dim)] uppercase hf-800-800"
+  >
+    <span class="inline-flex flex-col items-center gap-2.5">
+      <span class="flex items-center gap-2">
+        <span aria-hidden="true" class="text-[var(--ink-faint)]">[</span>
+        <span>scroll</span>
+        <span aria-hidden="true" class="text-[var(--ink-faint)]">]</span>
+      </span>
+      <span class="relative block h-8 w-px overflow-hidden bg-[var(--line)]">
+        <span
+          class="absolute left-0 top-0 h-3 w-px animate-[scroll-line_1.8s_ease-in-out_infinite] bg-[var(--ink)]"
+        ></span>
+      </span>
+    </span>
+  </div>
+</hero-section>
+
+<script>
+  /** live clock (HH:MM:SS in the site timezone), paused when the tab
+   *  is hidden. Placeholder "--:--:--" in static HTML; first tick on
+   *  the next animation frame after connect. */
+  function formatTime(timezone: string): string {
+    if (typeof Intl === "undefined") {
+      const d = new Date();
+      const p = (n: number) => String(n).padStart(2, "0");
+      return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+    try {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+        timeZone: timezone,
+      }).formatToParts(new Date());
+      const get = (t: string) =>
+        parts.find((p) => p.type === t)?.value ?? "00";
+      return `${get("hour")}:${get("minute")}:${get("second")}`;
+    } catch {
+      const d = new Date();
+      const p = (n: number) => String(n).padStart(2, "0");
+      return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+  }
+
+  class HeroSectionEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      // The state check covers a loader that dismissed before this
+      // component connected during a document or ClientRouter lifecycle.
+      const reveal = () => this.classList.add("revealed");
+      const loaderDismissed = document.documentElement.dataset.loaderState === "dismissed";
+      if (loaderDismissed) {
+        this.classList.add("is-client-navigation");
+      }
+      if (loaderDismissed) reveal();
+      else window.addEventListener("loader:dismiss", reveal, { once: true });
+      const safety = setTimeout(reveal, 6000);
+      this.cleanupFns.push(() => {
+        window.removeEventListener("loader:dismiss", reveal);
+        clearTimeout(safety);
+      });
+
+      // ── live clock ───────────────────────────────────────────────
+      const clock = this.querySelector<HTMLElement>(".hero-clock");
+      if (clock) {
+        const tz = this.dataset.timezone ?? "Africa/Algiers";
+        const tick = () => (clock.textContent = formatTime(tz));
+        const raf = requestAnimationFrame(tick);
+        let id: ReturnType<typeof setInterval> | null = setInterval(tick, 1000);
+        const onVis = () => {
+          if (document.hidden) {
+            if (id) {
+              clearInterval(id);
+              id = null;
+            }
+          } else if (!id) {
+            tick();
+            id = setInterval(tick, 1000);
+          }
+        };
+        document.addEventListener("visibilitychange", onVis);
+        this.cleanupFns.push(() => {
+          cancelAnimationFrame(raf);
+          if (id) clearInterval(id);
+          document.removeEventListener("visibilitychange", onVis);
+        });
+      }
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("hero-section", HeroSectionEl);
+</script>
+
+<style>
+  @keyframes hero-fade {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes scroll-line {
+    0% {
+      transform: translateY(-12px);
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(32px);
+      opacity: 0;
+    }
+  }
+  @keyframes status-pulse {
+    0%,
+    100% {
+      opacity: 0.4;
+      transform: scale(0.9);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+  }
+
+  /* gated elements: hidden until the hero is revealed; each class
+     carries its original duration/delay from the React fade() helper */
+  .hero-gated {
+    opacity: 0;
+  }
+  .hero-root.revealed .hf-200-0 {
+    animation: hero-fade 200ms var(--ease) 0ms both;
+  }
+  .hero-root.revealed .hf-500-200 {
+    animation: hero-fade 500ms var(--ease) 200ms both;
+  }
+  .hero-root.revealed .hf-700-100 {
+    animation: hero-fade 700ms var(--ease) 100ms both;
+  }
+  .hero-root.revealed .hf-800-0 {
+    animation: hero-fade 800ms var(--ease) 0ms both;
+  }
+  .hero-root.revealed .hf-800-400 {
+    animation: hero-fade 800ms var(--ease) 400ms both;
+  }
+  .hero-root.revealed .hf-800-600 {
+    animation: hero-fade 800ms var(--ease) 600ms both;
+  }
+  .hero-root.revealed .hf-800-800 {
+    animation: hero-fade 800ms var(--ease) 800ms both;
+  }
+  .hero-root.is-client-navigation .hero-gated {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+</style>

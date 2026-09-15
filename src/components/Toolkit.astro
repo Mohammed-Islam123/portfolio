@@ -1,0 +1,356 @@
+---
+/**
+ * Toolkit — periodic-table-style stack grid (gorix-inspired).
+ *
+ *  - each tool is a cell: per-category ID, logo, lowercase name
+ *    (no experience-years display — the per-category ID is the only number)
+ *  - cells grouped by category into 3-col mini-grids with "// label" headers
+ *  - filter row: gorix-style transparent text buttons with a sliding
+ *    pill indicator that animates to the active filter
+ *  - spotlight hover: hovering one cell dims the rest (gorix-style)
+ *  - brand color drives each cell's border (faint tint at rest, full
+ *    color + glow on hover)
+ *
+ *  ── Hover-for-description ──────────────────────────────────────────
+ *  Cells that carry a `tool.description` reveal it directly on hover —
+ *  no click, no tooltip-hint, no popover. A small frosted panel slides
+ *  up above the cell showing the tool name + the full note. A tiny amber
+ *  dot in the top-right of a cell marks it as having a note. Cells
+ *  without a description are plain (logo + name already on the tile).
+ *
+ *  ── Click-to-toggle (mobile + desktop) ─────────────────────────────
+ *  On touch devices there is no hover, so the description was
+ *  unreachable. Clicking a cell with a note TOGGLES the description
+ *  open/closed. When open, the cell gets the same expanded visual
+ *  effect as hover (scale 1.22, spotlight dim, bright border + glow)
+ *  via an `is-active` class on the button + `is-open` on the wrapper.
+ *
+ *  ── Close behaviors ────────────────────────────────────────────────
+ *    • click the cell again -> toggle closed
+ *    • Escape key -> close (a11y)
+ *    • clicking another cell anywhere in the toolkit -> the first closes
+ *      (only one open at a time, managed by the web component)
+ *    • hovering away does NOT close a toggled-open cell
+ */
+import { toolGroups } from "../config/toolkit";
+import Section from "./primitives/Section.astro";
+import SectionLabel from "./primitives/SectionLabel.astro";
+import Reveal from "./primitives/Reveal.astro";
+import TechIcon from "./icons/TechIcon.astro";
+
+const filters = [
+  { id: "all", label: "all" },
+  ...toolGroups.map((g) => ({ id: g.id, label: g.label.replace("// ", "") })),
+];
+const pad = (n: number) => String(n).padStart(2, "0");
+---
+
+<toolkit-grid>
+  <Section id="toolkit" class="bg-[var(--bg-soft)]">
+    <div class="wrap">
+      <Reveal>
+        <SectionLabel>toolkit</SectionLabel>
+      </Reveal>
+      <Reveal delay={80}>
+        <h2 class="sec-title mt-3">what's in my toolstack</h2>
+      </Reveal>
+      <Reveal delay={140}>
+        <p class="mt-3 max-w-xl font-sans text-[var(--ink-muted)]">
+          The tools I reach for, grouped by where I actually live. Hover a
+          cell to spotlight it — the rest step back. Cells with a dot carry
+          a note that opens right on hover.
+        </p>
+      </Reveal>
+
+      <!-- ── filter row — gorix-style sliding pill ────────────────
+           On mobile the filter buttons can wrap to 2 rows. The sliding
+           indicator only works on a single row (offsetLeft/offsetWidth
+           are row-relative), so the JS detects wrap and hides the
+           indicator; the active button then carries an inverted style. -->
+      <Reveal delay={180}>
+        <div
+          class="relative mt-8 inline-flex max-w-full flex-wrap gap-1 rounded-[10px] border border-[var(--line-soft)] bg-[var(--bg)]/40 p-1 backdrop-blur-xl [scrollbar-width:none]"
+        >
+          <!-- sliding indicator (absolute, behind buttons) — hidden when
+               the row wraps (mobile). -->
+          <span
+            aria-hidden="true"
+            data-indicator
+            class="pointer-events-none absolute left-0 top-0 h-[calc(100%-0.5rem)] rounded-[10px] bg-[var(--surface-3)] transition-[transform,width,opacity] [transition-duration:var(--transition)]"
+            style="transform: translateX(0px); width: 0px; opacity: 0; margin-top: 2px;"
+          ></span>
+          {
+            filters.map((f, i) => (
+              <button
+                type="button"
+                data-filter={f.id}
+                class="relative z-10 shrink-0 rounded-[8px] px-3.5 py-1.5 font-mono text-xs tracking-[0.08em] transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+                aria-pressed={i === 0 ? "true" : "false"}
+              >
+                {f.label}
+              </button>
+            ))
+          }
+        </div>
+      </Reveal>
+
+      <!-- ── groups ───────────────────────────────────────────── -->
+      <div class="mt-10 flex flex-wrap gap-x-10 gap-y-8">
+        {
+          toolGroups.map((group, groupIdx) => (
+            <div data-group={group.id} class="transition-opacity [transition-duration:var(--transition)] opacity-100">
+              <p class="mb-3 inline-flex items-center gap-2 font-mono text-xs tracking-[0.16em] uppercase">
+                <span class="text-[var(--ink-muted)]">{group.label}</span>
+                <span class="h-px w-6 bg-[var(--ink-dim)]/40" aria-hidden="true" />
+                <span class="text-[var(--ink-dim)]">{group.tools.length}</span>
+              </p>
+              <div class="group/tiles grid grid-cols-3 gap-1.5" style="grid-template-columns: repeat(3, 72px); grid-auto-rows: 72px;">
+                {group.tools.map((tool, idx) => {
+                  const hasNote = !!tool.description;
+                  return (
+                    <div class={`group/cell relative ${hasNote ? "has-note" : ""}`} data-tk-cell>
+                      <button
+                        type="button"
+                        data-cell={`${groupIdx}:${idx}`}
+                        aria-label={`${tool.name}${hasNote ? " — click to toggle notes" : ""}`}
+                        aria-expanded={hasNote ? "false" : undefined}
+                        class="tk-cell relative flex h-[72px] w-[72px] flex-col justify-between overflow-hidden rounded-[9px] p-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+                      >
+                        {/* per-category incrementing ID — top-left, zero-padded.
+                            The only number on the cell. */}
+                        <span class="font-sans text-[10px] leading-none tabular-nums text-[var(--ink)]">
+                          {pad(idx + 1)}
+                        </span>
+                        {/* logo — center. The colored TechIcon is the ONE
+                            exception to gorix's monochrome chrome. */}
+                        <span class="flex flex-1 items-center justify-center">
+                          <TechIcon icon={tool.icon} brand={tool.brand} size={20} />
+                        </span>
+                        {/* name — bottom, sans lowercase */}
+                        <span class="w-full truncate text-center font-sans text-[11px] leading-none lowercase text-[var(--ink-muted)]">
+                          {tool.name}
+                        </span>
+                        {/* has-note indicator — tiny amber dot, top-right.
+                            Grows + glows brighter when the cell is open. */}
+                        {hasNote && (
+                          <span
+                            aria-hidden="true"
+                            class="tk-note-dot absolute right-1 top-1 h-1 w-1 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]"
+                            style="box-shadow: 0 0 6px var(--signal-glow);"
+                          />
+                        )}
+                      </button>
+
+                      {/* hover/click-reveal note panel — appears directly
+                          BELOW the cell on hover OR when toggled open,
+                          aligned to the cell's LEFT edge (not centered) so
+                          it never overflows off the left of the viewport.
+                          pointer-events-none so it never steals the hover
+                          from the cell and never blocks neighbours.
+
+                          We do NOT use focus-within here — it is unreliable
+                          for the toggle-off path (the button can retain
+                          :focus-visible after a click). */}
+                      {hasNote && (
+                        <div
+                          role="tooltip"
+                          class="note-panel pointer-events-none absolute left-0 top-full z-40 mt-2 w-64 translate-y-1 opacity-0 transition-[opacity,transform] [transition-duration:240ms] [transition-timing-function:var(--ease)] group-hover/cell:translate-y-0 group-hover/cell:opacity-100 group-[.is-open]/cell:translate-y-0 group-[.is-open]/cell:opacity-100"
+                        >
+                          <div
+                            class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--glass-border-soft)] bg-[var(--glass-bg-strong)] p-3.5 backdrop-blur-xl"
+                            style="box-shadow: var(--tk-panel-shadow), inset 0 1px 0 rgba(255,255,255,0.06);"
+                          >
+                            <div class="flex items-center gap-2">
+                              <TechIcon icon={tool.icon} brand={tool.brand} size={16} />
+                              <span class="font-sans text-[0.88rem] font-medium text-[var(--ink)]">
+                                {tool.name}
+                              </span>
+                            </div>
+                            <div
+                              aria-hidden="true"
+                              class="mt-2 h-px w-full"
+                              style={`background: linear-gradient(90deg, ${tool.brand}55, transparent);`}
+                            />
+                            <p class="mt-2 font-sans text-[0.84rem] leading-[1.6] text-[var(--ink-muted)]">
+                              {tool.description}
+                            </p>
+                          </div>
+                          {/* arrow pointing UP at the cell — sits at the cell's
+                              horizontal center (left-9 = 36px = half of 72px). */}
+                          <span
+                            aria-hidden="true"
+                            class="absolute -top-1 left-9 h-2 w-2 -rotate-45 border-l border-t border-[var(--glass-border-soft)] bg-[var(--glass-bg-strong)]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  </Section>
+</toolkit-grid>
+
+<script>
+  import { playSound } from "../scripts/sound-init";
+
+  class ToolkitGridEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+    private filter = "all";
+    private activeCell: string | null = null;
+    private ind = { x: 0, w: 0, ready: false };
+
+    connectedCallback() {
+      const filterBtns = Array.from(
+        this.querySelectorAll<HTMLButtonElement>("[data-filter]"),
+      );
+      const indicator = this.querySelector<HTMLElement>("[data-indicator]");
+      const groups = Array.from(this.querySelectorAll<HTMLElement>("[data-group]"));
+      const cells = Array.from(this.querySelectorAll<HTMLButtonElement>("[data-cell]"));
+
+      // ── filter row: active button styling + groups dimming ──────
+      const renderFilters = () => {
+        filterBtns.forEach((btn) => {
+          const isActive = btn.dataset.filter === this.filter;
+          btn.setAttribute("aria-pressed", String(isActive));
+          // when the sliding indicator is hidden (mobile/wrapped), the
+          // active button itself carries the visual weight via an
+          // inverted style. When the indicator IS visible (desktop),
+          // keep it text-only so the indicator shows through behind.
+          btn.classList.toggle("f-active-inverted", isActive && !this.ind.ready);
+          btn.classList.toggle("f-active-text", isActive && this.ind.ready);
+        });
+        groups.forEach((g) => {
+          const dimmed = this.filter !== "all" && this.filter !== g.dataset.group;
+          g.classList.toggle("opacity-25", dimmed);
+          g.classList.toggle("opacity-100", !dimmed);
+        });
+      };
+
+      // ── sliding active-indicator ─────────────────────────────────
+      const measure = () => {
+        const idx = filterBtns.findIndex((b) => b.dataset.filter === this.filter);
+        const el = filterBtns[idx];
+        const first = filterBtns[0];
+        if (el && first && indicator) {
+          // hide the indicator if the row has wrapped (mobile). We check
+          // if ANY button is in a different row than the first — not just
+          // the active one (otherwise "all" (first) active reads as
+          // unwrapped even when buttons HAVE wrapped to row 2).
+          const firstTop = first.offsetTop;
+          const wrapped = filterBtns.some((b) => b.offsetTop !== firstTop);
+          this.ind = { x: el.offsetLeft, w: el.offsetWidth, ready: !wrapped };
+          indicator.style.transform = `translateX(${this.ind.x}px)`;
+          indicator.style.width = `${this.ind.w}px`;
+          indicator.style.opacity = this.ind.ready ? "1" : "0";
+        }
+        renderFilters();
+      };
+
+      const applyFilter = (id: string) => {
+        this.filter = id;
+        measure();
+      };
+
+      filterBtns.forEach((btn) => {
+        btn.addEventListener("mouseenter", () => playSound("hover"));
+        btn.addEventListener("click", () => {
+          applyFilter(btn.dataset.filter ?? "all");
+          playSound("click");
+        });
+      });
+
+      measure();
+      window.addEventListener("resize", measure);
+      // re-measure once fonts/layout settle
+      const t = setTimeout(measure, 350);
+      this.cleanupFns.push(() => {
+        window.removeEventListener("resize", measure);
+        clearTimeout(t);
+      });
+
+      // ── cells: hover sound + click-to-toggle notes ───────────────
+      const closeActive = () => {
+        if (!this.activeCell) return;
+        const prev = this.querySelector<HTMLElement>(
+          `[data-cell="${this.activeCell}"]`,
+        );
+        prev?.classList.remove("is-active");
+        prev?.setAttribute("aria-expanded", "false");
+        prev?.closest("[data-tk-cell]")?.classList.remove("is-open");
+        const dot = prev?.querySelector<HTMLElement>(".tk-note-dot");
+        if (dot) {
+          dot.className =
+            "tk-note-dot absolute right-1 top-1 h-1 w-1 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]";
+          dot.setAttribute(
+            "style",
+            "box-shadow: 0 0 6px var(--signal-glow);",
+          );
+        }
+        this.activeCell = null;
+      };
+
+      const toggleCell = (id: string) => {
+        if (this.activeCell === id) {
+          closeActive();
+          return;
+        }
+        closeActive();
+        this.activeCell = id;
+        const cell = this.querySelector<HTMLElement>(`[data-cell="${id}"]`);
+        cell?.classList.add("is-active");
+        cell?.setAttribute("aria-expanded", "true");
+        cell?.closest("[data-tk-cell]")?.classList.add("is-open");
+        const dot = cell?.querySelector<HTMLElement>(".tk-note-dot");
+        if (dot) {
+          dot.className =
+            "tk-note-dot absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]";
+          dot.setAttribute(
+            "style",
+            "box-shadow: 0 0 10px var(--signal-glow), 0 0 4px var(--signal);",
+          );
+        }
+      };
+
+      cells.forEach((cell) => {
+        cell.addEventListener("mouseenter", () => playSound("hover"));
+        cell.addEventListener("click", () => {
+          const wrapper = cell.closest("[data-tk-cell]");
+          if (!wrapper?.classList.contains("has-note")) return;
+          toggleCell(cell.dataset.cell ?? "");
+          playSound("click");
+        });
+      });
+
+      // Escape closes an open cell (a11y)
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") closeActive();
+      };
+      window.addEventListener("keydown", onKey);
+      this.cleanupFns.push(() => window.removeEventListener("keydown", onKey));
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("toolkit-grid", ToolkitGridEl);
+</script>
+
+<style>
+  /* active filter button states (toggled by JS based on indicator
+     readiness — see renderFilters) */
+  .f-active-text {
+    color: var(--ink);
+  }
+  .f-active-inverted {
+    background: var(--ink);
+    color: var(--bg);
+  }
+</style>

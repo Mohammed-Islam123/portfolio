@@ -1,0 +1,89 @@
+---
+/**
+ * Custom 404 — on-brand "page not found" with terminal aesthetic.
+ *
+ * Layout: ASCII 404 mark, "page not found" headline, $ cwd line with
+ * blinking cursor, breadcrumb back-home + back-to-projects links.
+ * Mirrors the dark/amber "Engineered Calm" design system.
+ */
+import { siteConfig } from "../config/site";
+import Layout from "../layouts/Layout.astro";
+import UiIcon from "../components/icons/UiIcon.astro";
+---
+
+<Layout title={`Not Found · ${siteConfig.name}`}>
+  <main class="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-6 py-20">
+    <!-- ambient amber halo -->
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute left-1/2 top-1/2 h-[60vh] w-[80vw] -translate-x-1/2 -translate-y-1/2"
+      style="background: radial-gradient(ellipse 50% 50% at 50% 50%, var(--signal-soft) 0%, transparent 70%);"
+    >
+    </div>
+    <!-- hairline grid -->
+    <div
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-0 opacity-30"
+      style="background-image: linear-gradient(var(--line-soft) 1px, transparent 1px), linear-gradient(90deg, var(--line-soft) 1px, transparent 1px); background-size: 48px 48px; mask-image: radial-gradient(ellipse at center, #000 0%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, transparent 70%);"
+    >
+    </div>
+
+    <div class="relative z-10 w-full max-w-2xl text-center">
+      <!-- ASCII 404 mark -->
+      <pre
+        class="mx-auto mb-8 font-mono text-[clamp(0.7rem,3vw,1.1rem)] leading-tight text-[var(--signal)]"
+        style="text-shadow: 0 0 24px var(--signal-glow);"
+        aria-hidden="true"
+      >{`  _  _   ___   _  _
+ | || | / _ \\ | || |
+ | __ || (_) || __ |
+ |_| |_| \\___/ |_| |_|
+`}</pre>
+
+      <!-- error label -->
+      <p class="font-mono text-xs tracking-[0.42em] text-[var(--ink-dim)] uppercase">
+        // error · not_found
+      </p>
+
+      <!-- headline -->
+      <h1
+        class="mt-4 font-mono font-bold leading-[1.05] tracking-[-0.03em] text-[var(--ink)]"
+        style="font-size: clamp(1.8rem, 5vw, 2.8rem);"
+      >
+        this page returned <span class="text-[var(--signal)]">404</span>.
+      </h1>
+
+      <!-- terminal-style cwd + blinking cursor -->
+      <div
+        class="mt-6 inline-flex items-center gap-2 rounded-md border border-[var(--line)] bg-[var(--surface)]/60 px-4 py-2 font-mono text-sm text-[var(--ink-muted)] backdrop-blur-sm"
+      >
+        <span class="text-[var(--signal)]">$</span>
+        <span class="text-[var(--ink-dim)]">cd</span>
+        <span>~/{siteConfig.name.toLowerCase().replace(/\s+/g, "-")}</span>
+        <span class="blink-cursor" aria-hidden="true"></span>
+      </div>
+
+      <p class="mt-6 max-w-md mx-auto font-sans text-sm leading-[1.7] text-[var(--ink-muted)]">
+        The route you hit isn't one of mine. Maybe a typo, maybe a stale
+        link — either way, the rest of the site is still here.
+      </p>
+
+      <!-- breadcrumb-style back links -->
+      <div class="mt-8 flex flex-wrap items-center justify-center gap-4 font-mono text-sm">
+        <a
+          href="/"
+          class="group/home inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--signal)] px-4 py-2.5 text-[var(--bg)] transition-transform [transition-duration:var(--transition-fast)] hover:scale-[1.02]"
+        >
+          <span aria-hidden="true"><UiIcon name="chevron-right" size={12} /></span>
+          <span>back home</span>
+        </a>
+        <a href="/#projects" class="cmd-link text-sm">
+          <span class="underline-grow">view projects</span>
+        </a>
+        <a href={`mailto:${siteConfig.email}`} class="cmd-link text-sm">
+          <span class="underline-grow">report a broken link</span>
+        </a>
+      </div>
+    </div>
+  </main>
+</Layout>

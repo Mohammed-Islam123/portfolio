@@ -1,0 +1,334 @@
+---
+/**
+ * /projects/[slug] — project case page.
+ * Hero (accent-tinted, ghosted title) → challenge → highlights → code
+ * snippets → tech → links → prev/next.
+ * Links from the carousel's "› case" button land here.
+ */
+import { projects, type Project } from "../../config/projects";
+import { siteConfig } from "../../config/site";
+import Layout from "../../layouts/Layout.astro";
+import TechIcon from "../../components/icons/TechIcon.astro";
+import ArrowRight from "../../components/icons/ArrowRight.astro";
+import UiIcon from "../../components/icons/UiIcon.astro";
+import ReadingProgress from "../../components/ReadingProgress.astro";
+import { highlightCode } from "../../lib/highlight";
+
+export function getStaticPaths() {
+  return projects.map((p) => ({ params: { slug: p.slug }, props: { project: p } }));
+}
+
+const { project } = Astro.props;
+const idx = projects.findIndex((p) => p.slug === project.slug);
+const prev = idx > 0 ? projects[idx - 1] : null;
+const next = idx < projects.length - 1 ? projects[idx + 1] : null;
+
+const DETAIL_STATUS_STYLES: Record<
+  NonNullable<Project["status"]>,
+  { color: string; border: string; dot: string }
+> = {
+  shipped: { color: "var(--good)", border: "var(--good)", dot: "var(--good)" },
+  "in-production": { color: "var(--signal)", border: "var(--signal)", dot: "var(--signal)" },
+  experimental: { color: "#22D3EE", border: "#22D3EE", dot: "#22D3EE" },
+  wip: { color: "var(--ink-dim)", border: "var(--ink-dim)", dot: "var(--ink-dim)" },
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const buildYear = new Date().getFullYear();
+
+// snippet views computed up front — keeps TS annotations out of the
+// template expressions (the compiler dislikes generics there)
+const LANG_LABEL: Record<string, string> = {
+  rust: "rs",
+  csharp: "c#",
+  typescript: "ts",
+  javascript: "js",
+  go: "go",
+  python: "py",
+  sql: "sql",
+  bash: "sh",
+};
+const snippetViews = (project.snippets ?? []).map((snip) => ({
+  label: snip.label,
+  langLabel: LANG_LABEL[snip.language.toLowerCase()] ?? snip.language,
+  gutter: snip.code.replace(/\n$/, "").split("\n").map((_, i) => i + 1),
+  highlighted: highlightCode(snip.code, snip.language),
+}));
+---
+
+<Layout title={`${project.title} · Mohamed Islam`} description={project.description}>
+  <div class="relative min-h-[100svh]">
+    <ReadingProgress />
+    <!-- ── hero ───────────────────────────────────────────────── -->
+    <header
+      class="relative overflow-hidden border-b border-[var(--line-soft)] pt-[calc(var(--nav-h)+3rem)]"
+      style={`background: radial-gradient(120% 100% at 15% 0%, ${project.accent}26 0%, transparent 55%), var(--bg);`}
+    >
+      <!-- grid texture -->
+      <div
+        class="absolute inset-0 opacity-30"
+        style="background-image: linear-gradient(var(--line-soft) 1px, transparent 1px), linear-gradient(90deg, var(--line-soft) 1px, transparent 1px); background-size: 32px 32px;"
+      >
+      </div>
+      <!-- huge ghosted title — bumped opacity for presence, accent-tinted -->
+      <div
+        class="pointer-events-none absolute -bottom-8 left-0 right-0 select-none text-center font-mono font-bold tracking-[-0.04em]"
+        style={`font-size: clamp(4rem, 18vw, 12rem); line-height: 0.9; color: ${project.accent}10; text-shadow: 0 0 80px ${project.accent}20;`
+        }
+        aria-hidden="true"
+      >
+        {project.title}
+      </div>
+
+      <div class="relative wrap pb-16 pt-6">
+        <a
+          href="/#projects"
+          class="group inline-flex items-center gap-1.5 font-mono text-xs text-[var(--ink-dim)] transition-colors hover:text-[var(--signal)]"
+        >
+          <ArrowRight class="rotate-180 transition-transform [transition-duration:var(--transition-fast)] group-hover:-translate-x-0.5" />
+          back to projects
+        </a>
+
+        <div class="mt-8 flex flex-wrap items-center gap-3 font-mono text-xs text-[var(--ink-dim)]">
+          <span class="tabular-nums">{pad(idx + 1)}</span>
+          <span class="text-[var(--line)]">/</span>
+          <span class="text-[var(--ink-muted)]">{project.slug}</span>
+          <span class="text-[var(--line)]">/</span>
+          <span>{project.year}</span>
+        </div>
+
+        <h1
+          class="mt-4 font-mono font-bold leading-[1.02] tracking-[-0.04em] text-[var(--ink)]"
+          style="font-size: clamp(2.4rem, 7vw, 4.5rem);"
+        >
+          {project.title}
+        </h1>
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <p class="font-mono text-sm tracking-[0.12em] text-[var(--signal)] uppercase">
+            {project.category}
+          </p>
+          {
+            project.status && (
+              <span
+                class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-xs tracking-wide uppercase"
+                style={`border-color: ${DETAIL_STATUS_STYLES[project.status].border}; color: ${DETAIL_STATUS_STYLES[project.status].color}; background-color: ${DETAIL_STATUS_STYLES[project.status].border}15;`}
+              >
+                <span
+                  class="inline-block h-1.5 w-1.5 rounded-full"
+                  style={`background-color: ${DETAIL_STATUS_STYLES[project.status].dot}; box-shadow: 0 0 6px ${DETAIL_STATUS_STYLES[project.status].dot}80;`}
+                />
+                {project.status}
+              </span>
+            )
+          }
+        </div>
+        <p class="mt-6 max-w-2xl font-sans text-[clamp(1rem,1.6vw,1.15rem)] leading-[1.7] text-[var(--ink-muted)]">
+          {project.description}
+        </p>
+
+        <!-- quick links — refined with accent hover -->
+        {
+          project.links.length > 0 && (
+            <div class="mt-7 flex flex-wrap gap-2">
+              {project.links.map((l) => (
+                <a
+                  href={l.href}
+                  class="group/link inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 font-mono text-xs text-[var(--ink-muted)] transition-[border-color,color,background-color,transform] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 hover:border-[var(--signal)] hover:bg-[var(--signal-soft)] hover:text-[var(--signal)]"
+                >
+                  <span aria-hidden="true" class="transition-transform [transition-duration:var(--transition-fast)] group-hover/link:translate-x-0.5">
+                    <UiIcon name="arrow-up-right" size={14} />
+                  </span>
+                  {l.label}
+                </a>
+              ))}
+            </div>
+          )
+        }
+      </div>
+    </header>
+
+    <!-- ── body ───────────────────────────────────────────────── -->
+    <main class="wrap grid gap-12 py-16 md:grid-cols-[1fr_18rem] md:gap-16">
+      <!-- min-w-0 so the grid child can shrink below its content's
+           intrinsic width on mobile (prevents code blocks from forcing
+           the page to overflow horizontally). -->
+      <div class="min-w-0 max-w-[44rem]">
+        <!-- challenge — bumped leading + ink body for readability -->
+        <p class="mono-label">
+          <span class="text-[var(--ink-dim)]">//</span>
+          <span class="text-[var(--signal)]">the challenge</span>
+        </p>
+        <p class="mt-5 font-sans text-[1.1rem] leading-[1.75] text-[var(--ink)]">
+          {project.challenge}
+        </p>
+
+        <!-- highlights — numbered with bigger gap + accent on hover -->
+        <p class="mono-label mt-14">
+          <span class="text-[var(--ink-dim)]">//</span>
+          <span class="text-[var(--signal)]">what I shipped</span>
+        </p>
+        <ul class="mt-5 flex flex-col gap-5">
+          {
+            project.highlights.map((h, i) => (
+              <li class="group/hl flex gap-4 rounded-[var(--radius-sm)] border border-transparent p-2 transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--line-soft)] hover:bg-[var(--surface)]/40">
+                <span
+                  class="mt-1 shrink-0 font-mono text-xs tabular-nums text-[var(--signal)] transition-transform [transition-duration:var(--transition-fast)] group-hover/hl:scale-110"
+                  style="text-shadow: 0 0 8px var(--signal-glow);"
+                >
+                  {pad(i + 1)}
+                </span>
+                <span class="font-sans text-[1rem] leading-[1.7] text-[var(--ink-muted)]">
+                  {h}
+                </span>
+              </li>
+            ))
+          }
+        </ul>
+
+        <!-- code snippets — rendered with the shared syntax highlighter -->
+        {
+          snippetViews.length > 0 && (
+            <>
+              <p class="mono-label mt-14">
+                <span class="text-[var(--ink-dim)]">//</span>
+                <span class="text-[var(--signal)]">from the source</span>
+              </p>
+              <div class="mt-5 flex flex-col gap-6">
+                {snippetViews.map((snip) => (
+                  <div class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-2)]">
+                    <!-- title bar — label + language + line count -->
+                    <div class="flex items-center justify-between border-b border-[var(--line-soft)] bg-[var(--surface-3)]/40 px-4 py-2">
+                      <div class="flex min-w-0 items-center gap-2">
+                        <span class="truncate font-mono text-xs tracking-[0.16em] uppercase text-[var(--ink-muted)]">
+                          {snip.label}
+                        </span>
+                      </div>
+                      <div class="flex shrink-0 items-center gap-3 font-mono text-xs text-[var(--ink-dim)]">
+                        <span class="tracking-[0.12em] uppercase">{snip.langLabel}</span>
+                        <span class="text-[var(--line)]">·</span>
+                        <span class="tabular-nums">{snip.gutter.length} ln</span>
+                      </div>
+                    </div>
+                    <!-- code body — line numbers gutter + highlighted code.
+                         The outer div is overflow-hidden so the page itself
+                         never scrolls horizontally; only the inner <pre>
+                         scrolls. -->
+                    <div class="flex overflow-hidden">
+                      <pre
+                        aria-hidden="true"
+                        class="shrink-0 select-none border-r border-[var(--line-soft)] py-4 pr-3 pl-4 text-right font-mono text-[0.78rem] leading-[1.65] text-[var(--ink-dim)]/70"
+                      >
+                        {snip.gutter.map((n) => (
+                          <span class="block tabular-nums">{n}</span>
+                        ))}
+                      </pre>
+                      <pre data-lenis-prevent class="min-w-0 flex-1 overflow-x-auto py-4 pl-4 pr-6 font-mono text-[0.82rem] leading-[1.65] text-[var(--ink-muted)]">
+                        <code class="block" set:html={snip.highlighted} />
+                      </pre>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )
+        }
+      </div>
+
+      <!-- sidebar: stack — aligned left, refined cards with brand accents -->
+      <aside class="md:sticky md:top-28 md:self-start">
+        <p class="mono-label">
+          <span class="text-[var(--ink-dim)]">//</span>
+          <span class="text-[var(--signal)]">stack</span>
+        </p>
+        <ul class="mt-4 flex flex-col gap-2">
+          {
+            project.tech.map((t) => (
+              <li class="group/tech flex items-center gap-3 rounded-[var(--radius-sm)] border border-[var(--line-soft)] bg-[var(--surface)]/60 px-3 py-2 transition-[border-color,background-color] [transition-duration:var(--transition-fast)] hover:border-[var(--line)] hover:bg-[var(--surface)]">
+                <span class="transition-transform [transition-duration:var(--transition-fast)] group-hover/tech:scale-110">
+                  <TechIcon icon={t.icon} brand={t.brand} size={18} />
+                </span>
+                <span class="font-mono text-sm text-[var(--ink)]">{t.label}</span>
+                <span
+                  aria-hidden="true"
+                  class="ml-auto h-1 w-1 rounded-full opacity-0 transition-opacity [transition-duration:var(--transition-fast)] group-hover/tech:opacity-100"
+                  style={`background: ${t.brand}; box-shadow: 0 0 6px ${t.brand};`}
+                />
+              </li>
+            ))
+          }
+        </ul>
+
+        <p class="mono-label mt-8">
+          <span class="text-[var(--ink-dim)]">//</span>
+          <span class="text-[var(--signal)]">meta</span>
+        </p>
+        <dl class="mt-4 flex flex-col gap-2 font-mono text-xs">
+          <div class="flex justify-between gap-3 border-b border-[var(--line-soft)] pb-2">
+            <dt class="text-[var(--ink-dim)]">year</dt>
+            <dd class="text-[var(--ink)] tabular-nums">{project.year}</dd>
+          </div>
+          <div class="flex justify-between gap-3 border-b border-[var(--line-soft)] pb-2">
+            <dt class="text-[var(--ink-dim)]">role</dt>
+            <dd class="text-[var(--ink)]">backend · infra</dd>
+          </div>
+          <div class="flex justify-between gap-3">
+            <dt class="text-[var(--ink-dim)]">status</dt>
+            <dd class="text-[var(--ink)]">{project.status ?? "shipped"}</dd>
+          </div>
+        </dl>
+      </aside>
+    </main>
+
+    <!-- ── prev / next ────────────────────────────────────────── -->
+    <nav class="border-t border-[var(--line-soft)]">
+      <div class="wrap grid grid-cols-2 gap-4 py-8">
+        {
+          prev ? (
+            <a
+              href={`/projects/${prev.slug}`}
+              class="group flex flex-col gap-1 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-4 transition-[border-color,transform] [transition-duration:var(--transition)] hover:-translate-y-0.5 hover:border-[var(--signal)]"
+            >
+              <span class="inline-flex items-center gap-1.5 font-mono text-xs text-[var(--ink-dim)]"><UiIcon name="arrow-left" size={12} /> previous</span>
+              <span class="font-mono text-base text-[var(--ink)] transition-colors [transition-duration:var(--transition-fast)] group-hover:text-[var(--signal)]">
+                {prev.title}
+              </span>
+            </a>
+          ) : (
+            <span />
+          )
+        }
+        {
+          next ? (
+            <a
+              href={`/projects/${next.slug}`}
+              class="group flex flex-col items-end gap-1 rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-4 text-right transition-[border-color,transform] [transition-duration:var(--transition)] hover:-translate-y-0.5 hover:border-[var(--signal)]"
+            >
+              <span class="inline-flex items-center gap-1.5 font-mono text-xs text-[var(--ink-dim)]">next <UiIcon name="arrow-right" size={12} /></span>
+              <span class="font-mono text-base text-[var(--ink)] transition-colors [transition-duration:var(--transition-fast)] group-hover:text-[var(--signal)]">
+                {next.title}
+              </span>
+            </a>
+          ) : (
+            <span />
+          )
+        }
+      </div>
+    </nav>
+
+    <!-- ── footer strip ───────────────────────────────────────── -->
+    <footer class="border-t border-[var(--line-soft)] py-6">
+      <div class="wrap flex items-center justify-between font-mono text-xs text-[var(--ink-dim)]">
+        <a href="/" class="inline-flex items-center gap-1.5 transition-colors hover:text-[var(--signal)]"><UiIcon name="arrow-left" size={12} /> home</a>
+        <span>© <span data-year>{buildYear}</span> {siteConfig.fullName}</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- keep the footer year current in the visitor's year -->
+  <script is:inline data-astro-rerun>
+    (function () {
+      var el = document.querySelector("[data-year]");
+      if (el) el.textContent = String(new Date().getFullYear());
+    })();
+  </script>
+</Layout>

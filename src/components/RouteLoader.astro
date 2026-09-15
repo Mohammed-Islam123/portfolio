@@ -1,0 +1,68 @@
+<route-loader aria-hidden="true">
+  <span class="route-loader__bar"><span class="route-loader__fill"></span></span>
+  <span class="route-loader__label">loading</span>
+</route-loader>
+
+<style>
+  route-loader {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 200;
+    height: 2px;
+    pointer-events: none;
+  }
+
+  .route-loader__bar {
+    display: block;
+    width: 100%;
+    height: 2px;
+    opacity: 0;
+    transition: opacity 140ms linear;
+  }
+
+  .route-loader__fill {
+    display: block;
+    width: 34%;
+    height: 100%;
+    background: var(--ink);
+    box-shadow: 0 0 8px var(--signal-glow);
+    transform: translateX(-110%);
+  }
+
+  route-loader[data-state="loading"] .route-loader__bar,
+  route-loader[data-state="complete"] .route-loader__bar {
+    opacity: 1;
+  }
+
+  route-loader[data-state="loading"] .route-loader__fill {
+    animation: route-loader-sweep 1.1s var(--ease) infinite;
+  }
+  route-loader[data-state="complete"] .route-loader__fill { transform: translateX(320%); }
+
+  @keyframes route-loader-sweep {
+    from { transform: translateX(-110%); }
+    to { transform: translateX(320%); }
+  }
+
+  .route-loader__label {
+    position: fixed;
+    top: 0.7rem;
+    right: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    opacity: 0;
+    transition: opacity 140ms linear;
+  }
+
+  route-loader[data-state="loading"] .route-loader__label { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .route-loader__fill,
+    .route-loader__bar,
+    .route-loader__label { transition-duration: 120ms; }
+    route-loader[data-state="loading"] .route-loader__fill { animation-duration: 140ms; }
+  }
+</style>
