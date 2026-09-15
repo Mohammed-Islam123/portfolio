@@ -1,0 +1,1075 @@
+@import "@fontsource-variable/bricolage-grotesque";
+@import "@fontsource-variable/spline-sans-mono";
+@import "lenis/dist/lenis.css";
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * ──────────────────────────────────────────────────────────────────────────
+ *  DESIGN TOKENS — "Engineered Calm" (dark-first, near-monochrome + amber)
+ *  Single source of truth. All section/component styles reference these.
+ * ──────────────────────────────────────────────────────────────────────────
+ */
+
+:root {
+  /* ── surface / ink (warm monochrome — theoptimisticdesigner.com) ─── */
+  /*  The reference is PURELY monochrome: warm grays on near-black.
+   *  Warm = the blue channel runs 2-4 lower than red/green, giving a
+   *  subtle paper-like warmth instead of cold blue-gray. No accent
+   *  color is used decoratively — hierarchy comes entirely from
+   *  value (lightness), not hue. */
+  --bg:          #0B0B0B;   /* page background — reference exact value       */
+  --bg-soft:     #101010;   /* alternate section background (warm)          */
+  --surface:     #141414;   /* cards, cells, raised panels                  */
+  --surface-2:   #181818;   /* chips, code blocks, hover surface            */
+  --surface-3:   #1E1E1E;   /* nav pill, deepest raised                     */
+
+  --ink:         #FFFFFF;   /* primary text — pure white (reference)        */
+  --ink-soft:    #C9C9C6;   /* high-emphasis secondary (warm light gray)    */
+  --ink-muted:   #B3B3B3;   /* secondary text, lead                         */
+  --ink-dim:     #8A8A88;   /* tertiary, warm mid-gray                      */
+  --ink-faint:   #6E6E6C;   /* micro-labels, mono eyebrows (warm)           */
+  --ink-deep:    #5A5A58;   /* deepest readable warm gray, dates/hints      */
+
+  --line:        #232323;   /* card / cell borders (warm)                   */
+  --line-soft:   #1A1A1A;   /* nav, section dividers                        */
+  --line-strong: #2E2E2E;   /* hover/emphasized borders                     */
+
+  /* dot/particle field color — white dots on dark bg */
+  --field-color: 255, 255, 255;
+  /* portrait scrim color (dark, matches bg) */
+  --scrim-color: 8, 8, 12;
+  /* field alpha multiplier — white-on-dark reads brighter at the same
+     alpha than dark-on-light, so dark mode uses 1.0. Light mode bumps
+     to 2.0 so the dots/lines stay clearly visible on warm paper. */
+  --field-alpha-boost: 1.0;
+
+  /* ── toolkit cell chrome — monochrome white-on-dark (gorix-inspired).
+      Kept as explicit vars (not var(--line)) so the hover inset/ring can
+      layer multiple white tints at different opacities the way gorix does.
+      See .tk-cell rules below. */
+  --tk-border:        rgb(255 255 255 / 0.15);
+  --tk-bg:            rgb(255 255 255 / 0.04);
+  --tk-border-hover:  rgb(255 255 255 / 0.30);
+  --tk-bg-hover:      rgb(255 255 255 / 0.08);
+  --tk-inset-hover:   rgb(255 255 255 / 0.22);
+  --tk-ring-hover:    rgb(255 255 255 / 0.06);
+  --tk-panel-shadow:  0 12px 40px -12px rgba(0,0,0,0.7);
+
+  /* ── signal (RETAINED ONLY for semantic status + a11y focus) ─────── */
+  /*  The reference site is 100% monochrome. We keep a single thread of
+   *  the prior amber identity for: (1) the "open to work" status dot
+   *  (semantic, like a typical availability indicator) and (2) the
+   *  accessibility focus ring (visible, required). Everything else —
+   *  links, hovers, labels, headings, borders — is pure monochrome. */
+  --signal:      #FFB000;   /* status dot + focus ring ONLY                 */
+  --signal-2:    #FFC94D;
+  --signal-soft: rgba(255, 176, 0, 0.14);
+  --signal-glow: rgba(255, 176, 0, 0.35);
+
+  /* ── custom cursor (theoptimisticdesigner.com exact match) ────────── */
+  /*  Two squares — a small solid dot + a larger outline ring — both using
+   *  mix-blend-mode:difference so they auto-invert whatever sits underneath
+   *  (white on dark bg, black on light bg). The dot is solid white at rest;
+   *  the ring is white-at-35% at rest, expands to 48px + turns soft green
+   *  on hover over a, button. Same colors work in both themes thanks to the
+   *  difference blend — no per-theme overrides needed. */
+  --cursor-dot:    8px;            /* dot size, solid square            */
+  --cursor-ring:   30px;           /* ring size at rest                 */
+  --cursor-ring-grow: 48px;        /* ring size on hover                */
+  --cursor-text:   #FFFFFF;        /* dot fill + ring border at rest    */
+  --cursor-border-rest: rgba(255, 255, 255, 0.35);
+  --cursor-accent: #FFB000;        /* ring border on hover (amber)      */
+  --cursor-duration: 250ms;        /* ring size + color transition     */
+  --cursor-timing: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── glass (depth layering — premium frosted surfaces) ──────────── */
+  --glass-bg:       rgba(18, 18, 18, 0.55);
+  --glass-bg-strong:rgba(18, 18, 18, 0.78);
+  --glass-border:   rgba(255, 255, 255, 0.06);
+  --glass-border-soft: rgba(255, 255, 255, 0.10);
+  --glass-blur:     14px;
+  --glass-inset:    inset 0 1px 0 rgba(255, 255, 255, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+
+  /* ── nav haze — opaque blurred navigation material ─────────────── */
+  /* This material is fully opaque: page content must never be visible
+     beneath the navigation. The diffuse gradients provide its soft haze. */
+  --nav-haze-bg:        rgb(11 11 11);
+  --nav-haze-bg-strong: rgb(15 15 15);
+  --nav-haze-overlay:
+    radial-gradient(120% 180% at 0% -60%, rgb(255 255 255 / 0.055), transparent 58%),
+    radial-gradient(120% 150% at 100% 130%, rgb(0 0 0 / 0.34), transparent 68%);
+
+  --article-hero-image-opacity: 1;
+  --article-hero-image-filter: none;
+  --article-hero-tint: rgba(11, 11, 11, 0.60);
+  --article-hero-wash-start: transparent;
+  --article-hero-wash-end: var(--bg);
+
+  /* ── syntax highlighting (code blocks — monochrome + restraint) */
+  --syn-keyword: #C9C9C6;   /* high-emphasis gray — control flow           */
+  --syn-string:  #8A8A88;   /* mid gray — string literals                  */
+  --syn-comment: #5A5A58;   /* dim — comments (italic)                     */
+  --syn-number:  #FFFFFF;   /* white — numeric literals (emphasis)         */
+  --syn-type:    #B3B3B3;   /* muted — type names                          */
+  --syn-fn:      #FFFFFF;   /* white — function names                      */
+  --syn-punct:   #8A8A88;   /* dim — operators + punctuation               */
+  --syn-plain:   var(--ink-muted);
+
+  /* ── status (semantic, restrained) ───────────────────────────────── */
+  --good:        #3DD68C;   /* "open to work", ready                        */
+  --warn:        #FF8A00;   /* callout warnings                             */
+  --err:         #FF5A5A;   /* destructive                                  */
+
+  /* ── typography — Bricolage for reading, Spline Mono for technical UI */
+  --font-display: "Bricolage Grotesque Variable";
+  --font-mono:    "Spline Sans Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans:    var(--font-display), ui-sans-serif, sans-serif;
+
+  /* ── radii ───────────────────────────────────────────────────────── */
+  --radius-sm:   8px;
+  --radius:      14px;
+  --radius-lg:   20px;
+  --radius-full: 999px;
+
+  /* ── motion (calm deceleration — matches reference's quiet feel) ─── */
+  --ease:        cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --transition:  300ms var(--ease);
+  --transition-fast: 150ms var(--ease);
+  --transition-slow: 600ms var(--ease);
+
+  /* ── layout (reference — generous gutters, wide container) ───────── */
+  --wrap:        88rem;
+  --prose:       680px;
+  --gutter:      clamp(1.5rem, 5vw, 4rem);
+  --nav-h:       64px;
+}
+
+/*
+ * ──────────────────────────────────────────────────────────────────────────
+ *  LIGHT THEME
+ *  Activated by `<html class="light">` (set by ThemeToggle, persisted to
+ *  localStorage, with a prefers-color-scheme fallback). Mirrors the dark
+ *  palette's warm-monochrome discipline: warm off-white paper, dark ink,
+ *  warm-gray surfaces + borders. Amber signal stays the same (semantic).
+ *  All component styles reference the same CSS vars, so this single block
+ *  cascades everywhere — no per-component light overrides needed.
+ * ──────────────────────────────────────────────────────────────────────────
+ */
+html.light {
+  --bg:          #F4F2EE;   /* warm paper — the page background            */
+  --bg-soft:     #EFECE6;   /* alternate section background (warm)         */
+  --surface:     #FFFFFF;   /* cards, cells, raised panels                 */
+  --surface-2:   #F7F5F1;   /* chips, code blocks, hover surface           */
+  --surface-3:   #ECE8E1;   /* nav pill, deepest raised                    */
+
+  --ink:         #14140F;   /* primary text — near-black warm              */
+  --ink-soft:    #2E2E28;   /* high-emphasis secondary                     */
+  --ink-muted:   #4A4A43;   /* secondary text, lead                        */
+  --ink-dim:     #5E5E55;   /* tertiary, warm mid-gray                     */
+  --ink-faint:   #6E6E64;   /* micro-labels, mono eyebrows (darker on paper) */
+  --ink-deep:    #6A6A60;   /* deepest readable warm gray, dates/hints     */
+
+  --line:        #DDD9D0;   /* card / cell borders (warm)                  */
+  --line-soft:   #E6E2D9;   /* nav, section dividers                       */
+  --line-strong: #C9C4B8;   /* hover/emphasized borders                    */
+
+  /* dot/particle field color — dark dots on light paper */
+  --field-color: 40, 40, 30;
+  /* portrait scrim color (light, matches bg) */
+  --scrim-color: 244, 242, 238;
+  /* field alpha multiplier — dark-on-light has lower perceptual contrast
+     at the same alpha than white-on-dark, so we double it here to keep
+     the dot field + ambient signal clearly visible on warm paper. */
+  --field-alpha-boost: 2.0;
+
+  /* ── toolkit cell chrome — dark-on-light for strong contrast on paper.
+      The dark-tint border + fill make every cell clearly visible on the
+      warm off-white background (white-on-white would be invisible).
+      Opacities are tuned to match the *perceived* weight of the dark-mode
+      white tints, not the raw alpha — dark strokes read heavier than
+      light strokes at the same alpha, so we dial them back slightly. */
+  --tk-border:        rgb(20 20 15 / 0.22);
+  --tk-bg:            rgb(20 20 15 / 0.025);
+  --tk-border-hover:  rgb(20 20 15 / 0.50);
+  --tk-bg-hover:      rgb(20 20 15 / 0.05);
+  --tk-inset-hover:   rgb(20 20 15 / 0.14);
+  --tk-ring-hover:    rgb(20 20 15 / 0.10);
+  --tk-panel-shadow:  0 12px 40px -12px rgba(0,0,0,0.18);
+
+  /* signal (kept identical — semantic status + a11y focus) */
+  --signal:      #C77700;   /* slightly darker amber so it reads on paper  */
+  --signal-2:    #B86A00;
+  --signal-soft: rgba(199, 119, 0, 0.12);
+  --signal-glow: rgba(199, 119, 0, 0.30);
+
+  /* NOTE: only the hover accent is overridden for light mode — the base
+   * dot/ring keep mix-blend-mode:difference (auto-inverts white→black);
+   * the grow state drops difference and uses this flat amber. */
+  --cursor-accent: #C77700;
+
+  /* glass (light — frosted white instead of frosted dark) */
+  --glass-bg:       rgba(255, 255, 255, 0.65);
+  --glass-bg-strong:rgba(255, 255, 255, 0.82);
+  --glass-border:   rgba(0, 0, 0, 0.06);
+  --glass-border-soft: rgba(0, 0, 0, 0.10);
+  --glass-blur:     14px;
+  --glass-inset:    inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.02);
+
+  /* nav haze (light — warm paper, fully opaque). */
+  --nav-haze-bg:        rgb(244 242 238);
+  --nav-haze-bg-strong: rgb(248 246 242);
+  --nav-haze-overlay:
+    radial-gradient(120% 180% at 0% -60%, rgb(255 255 255 / 0.64), transparent 58%),
+    radial-gradient(120% 150% at 100% 130%, rgb(53 45 30 / 0.075), transparent 68%);
+
+  --article-hero-image-opacity: 1;
+  --article-hero-image-filter: none;
+  --article-hero-tint: rgba(244, 242, 238, 0.60);
+  --article-hero-wash-start: transparent;
+  --article-hero-wash-end: var(--bg);
+
+  /* status (kept identical semantically; warn/err nudged for paper) */
+  --good:        #2BA76A;
+  --warn:        #C77700;
+  --err:         #D64545;
+}
+
+/* ── Loader scroll lock ────────────────────────────────────────────
+ * Applied to <html> while the terminal loading overlay is visible.
+ * !important on a class beats inline styles, so this reliably locks
+ * scroll during loading.
+ */
+html.loader-scroll-lock {
+  overflow: hidden !important;
+}
+
+@theme inline {
+  --color-bg:           var(--bg);
+  --color-bg-soft:      var(--bg-soft);
+  --color-surface:      var(--surface);
+  --color-surface-2:    var(--surface-2);
+  --color-surface-3:    var(--surface-3);
+  --color-ink:          var(--ink);
+  --color-ink-soft:     var(--ink-soft);
+  --color-ink-muted:    var(--ink-muted);
+  --color-ink-dim:      var(--ink-dim);
+  --color-ink-faint:    var(--ink-faint);
+  --color-ink-deep:     var(--ink-deep);
+  --color-line:         var(--line);
+  --color-line-soft:    var(--line-soft);
+  --color-line-strong:  var(--line-strong);
+  --color-signal:       var(--signal);
+  --color-signal-2:     var(--signal-2);
+  --color-good:         var(--good);
+  --color-warn:         var(--warn);
+  --color-err:          var(--err);
+  --font-display:       var(--font-display);
+  --font-sans:          var(--font-sans);
+  --font-mono:          var(--font-mono);
+  --radius-sm:          var(--radius-sm);
+  --radius-lg:          var(--radius-lg);
+  --radius-full:        var(--radius-full);
+}
+
+@layer base {
+  * {
+    border-color: var(--line);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+    overflow-x: clip;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.75;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+
+  [data-page-transition-root] {
+    transform-origin: center top;
+    transition: transform 450ms var(--ease), filter 450ms var(--ease);
+  }
+  [data-page-transition-root].is-route-leaving {
+    filter: brightness(0.5);
+    transform: scale(0.94);
+  }
+  ::selection {
+    background: var(--ink);
+    color: var(--bg);
+  }
+  /* custom scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--line);
+    border-radius: var(--radius-full);
+    border: 2px solid var(--bg);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-dim); }
+  :focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+  }
+}
+
+html.route-transitioning::view-transition-old(root),
+html.route-transitioning::view-transition-new(root) {
+  animation-timing-function: var(--ease);
+  animation-fill-mode: both;
+  mix-blend-mode: normal;
+}
+html.route-transitioning::view-transition-old(root) { animation: route-clip-out 450ms var(--ease) both; z-index: 1; }
+html.route-transitioning::view-transition-new(root) { animation: route-clip-in 700ms var(--ease) both; z-index: 2; }
+@keyframes route-clip-out { to { clip-path: inset(100% 0 0 0); } }
+@keyframes route-clip-in { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) {
+  [data-page-transition-root],
+  [data-page-transition-root].is-route-leaving { filter: none; transform: none; transition-duration: 120ms; }
+  html.route-transitioning::view-transition-old(root),
+  html.route-transitioning::view-transition-new(root) { animation-duration: 120ms; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  UTILITIES & COMPONENT PRIMITIVES
+ * ────────────────────────────────────────────────────────────────────── */
+
+@layer components {
+  /* layout container */
+  .wrap {
+    width: 100%;
+    max-width: var(--wrap);
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+  .prose-w { max-width: var(--prose); }
+
+  /* monospace label — Geist Mono micro-eyebrow (reference: 0.08em tracking) */
+  .mono-label {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  /* section title — serif display, large + heavy + high contrast so
+     section headings read clearly (user asked for "clearer" titles). */
+  .sec-title {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    line-height: 1.02;
+    font-size: clamp(2.75rem, 8vw, 6.5rem);
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  /* offset anchor scrolls for the floating nav so section tops
+     don't hide under the pill. */
+  section[id] {
+    scroll-margin-top: 96px;
+  }
+
+  /* grayscale-by-default portrait that blooms to color on hover.
+     Uses a dedicated class instead of Tailwind's group-hover:grayscale-0
+     because the v4 filter-var override is unreliable in this setup. */
+  .bw-img {
+    filter: grayscale(1);
+    transition: filter var(--transition);
+  }
+  .group:hover .bw-img,
+  .group:focus-within .bw-img {
+    filter: grayscale(0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bw-img { transition: none; }
+  }
+
+  /* ── toolkit cell — exact gorix.zip toolstack styling (monochrome chrome,
+     colored icon is the only exception). Implemented in plain CSS (not
+     Tailwind hover utilities) because Tailwind v4 gates hover: variants
+     behind @media (hover: hover), which gorix does NOT — gorix's scale
+     applies in all contexts. Matching gorix exactly means ungated CSS. */
+  .tk-cell {
+    border: 1px solid var(--tk-border);
+    background-color: var(--tk-bg);
+    transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  /* spotlight dim: when the tiles group is hovered OR any cell is toggled
+     active, every OTHER cell steps back to 40% opacity (gorix "step back").
+     The :not() exclusions ensure the hovered/active cell itself is NEVER
+     dimed — only its siblings are. This is critical for specificity:
+     without :not(), the dim rule would override the active cell's
+     full-opacity rule, making the active cell dim instead of bright.
+
+     NOTE: we deliberately do NOT use :focus / :focus-visible / :focus-within
+     here. Focus state is unreliable for the toggle-off path: after the
+     user clicks an active cell to close it, the button can retain
+     :focus-visible (especially on touch devices and some desktop browsers),
+     which would keep the cell visually scaled even though `is-active` was
+     removed. Relying ONLY on :hover (CSS) and .is-active (JS state) means
+     the visual state is always a clean mirror of the logical state. */
+  .group\/tiles:hover .tk-cell:not(:hover),
+  .group\/tiles:has(.tk-cell.is-active) .tk-cell:not(.is-active) {
+    opacity: 0.4;
+  }
+  /* the hovered/active cell comes back to full opacity, scales up 1.22
+     (gorix exact via transform), lifts z, brightens border + bg, and
+     gets the inset-top line + outer 1px ring. The top edge gets TWO
+     layers (inset + ring) while the sides get only the ring, so the top
+     border reads visibly thicker than the others on hover. Uses --tk-*
+     vars so the whole effect flips correctly in light mode (dark strokes
+     on paper instead of invisible white-on-white).
+     .is-active mirrors this EXACTLY for the click-toggled state so a
+     clicked-open cell is visually identical to a hovered cell (user
+     request: "the exact same effect as when we hover on it meaning the
+     same opacity and the same styles"). Keyboard a11y is preserved via
+     the Tailwind focus-visible:ring utility on the button itself — Tab
+     still shows a focus ring, just no scale-up (matching gorix). */
+  .group\/tiles:hover .tk-cell:hover,
+  .tk-cell.is-active {
+    opacity: 1;
+    transform: scale(1.22);
+    z-index: 20;
+    border-color: var(--tk-border-hover);
+    background-color: var(--tk-bg-hover);
+    box-shadow:
+      inset 0 1px 0 0 var(--tk-inset-hover),
+      0 0 0 1px var(--tk-ring-hover);
+    backdrop-filter: blur(6px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tk-cell { transition: none; }
+    .group\/tiles:hover .tk-cell:hover,
+    .tk-cell.is-active { transform: none; }
+  }
+
+  /* ── glass — frosted depth panel ─────────────────────────────────── */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur)) saturate(120%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(120%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-inset), 0 8px 32px -16px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Shared opaque-blur navigation chrome. Keep this recipe in one place
+     so desktop, mobile, blog, and hero system UI cannot drift apart. */
+  .nav-haze {
+    background-color: var(--nav-haze-bg);
+    background-image: var(--nav-haze-overlay);
+  }
+  .nav-haze--strong {
+    background-color: var(--nav-haze-bg-strong);
+  }
+  .nav-haze--elevated {
+    box-shadow: var(--glass-inset), 0 10px 30px -18px rgba(0, 0, 0, 0.72);
+  }
+
+  /* ── underline-grow — animated underline from left (links/CTAs) ──── */
+  .underline-grow {
+    position: relative;
+  }
+  .underline-grow::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    width: 100%;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform var(--transition);
+  }
+  .underline-grow:hover::after,
+  .underline-grow:focus-visible::after { transform: scaleX(1); }
+
+  /* ── cmd-link — command-line styled link: "> label" with underline ─ */
+  .cmd-link {
+    font-family: var(--font-mono);
+    color: var(--ink-muted);
+    transition: color var(--transition-fast);
+  }
+  .cmd-link::before {
+    content: "> ";
+    color: var(--ink-faint);
+    transition: color var(--transition-fast);
+  }
+  .cmd-link:hover {
+    color: var(--ink);
+  }
+  .cmd-link:hover::before {
+    color: var(--ink-soft);
+  }
+
+  /* ── blink-cursor — terminal block cursor, used inline (monochrome) ─ */
+  .blink-cursor {
+    display: inline-block;
+    width: 0.55em;
+    height: 1em;
+    background: var(--ink);
+    vertical-align: text-bottom;
+    margin-left: 2px;
+    animation: blink 1.1s steps(2, start) infinite;
+  }
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+  }
+
+  /* hairline grid background (subtle, for sections) */
+  .grid-bg {
+    background-image:
+      linear-gradient(var(--line-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line-soft) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: -1px -1px;
+    -webkit-mask-image: radial-gradient(ellipse at center, #000 0%, transparent 75%);
+    mask-image: radial-gradient(ellipse at center, #000 0%, transparent 75%);
+  }
+
+  /* ── prose measure — comfortable reading width (for future blog) ── */
+  .prose-measure {
+    max-width: 70ch;
+  }
+
+  /* ── drop cap — for the first paragraph of a long-form post (monochrome) */
+  .drop-cap::first-letter {
+    float: left;
+    font-family: var(--font-mono);
+    font-size: 3.4em;
+    line-height: 0.86;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0.05em 0.12em 0 0;
+  }
+  @media (max-width: 640px) {
+    .drop-cap::first-letter {
+      font-size: 2.8em;
+    }
+  }
+
+  /* ── syntax highlighting utility classes ────────────────────────── */
+  .syn-keyword { color: var(--syn-keyword); font-weight: 500; }
+  .syn-string  { color: var(--syn-string); }
+  .syn-comment { color: var(--syn-comment); font-style: italic; }
+  .syn-number  { color: var(--syn-number); }
+  .syn-type    { color: var(--syn-type); }
+  .syn-fn      { color: var(--syn-fn); }
+  .syn-punct   { color: var(--syn-punct); }
+  .syn-plain   { color: var(--syn-plain); }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  CUSTOM CURSOR — hide the native cursor over "scroll" zones when the
+ *  CustomCursor is active (fine pointer + motion allowed). The .cursor-custom
+ *  class is added to <html> by CustomCursor on enable. On touch / reduced
+ *  motion the class is absent, so the native cursor-grab fallback stays.
+ * ────────────────────────────────────────────────────────────────────── */
+.cursor-custom [data-cursor="scroll"],
+.cursor-custom [data-cursor="scroll"] * {
+  cursor: none !important;
+}
+
+/* `data-cursor="default"` is an explicit override ("show the native cursor
+   here, period") — it must win over a scroll-zone ancestor. Without this
+   exception, a small text link tagged default but living inside a scroll
+   container (e.g. project card ActionLinks inside the coverflow stage) would
+   inherit `cursor: none` from the stage and show the scroll pill instead of
+   the native pointer.
+
+   Three rules, in order of increasing specificity:
+   1. The default-zone element itself gets `cursor: auto` (browser picks the
+      right shape based on element type — pointer for links, text for
+      editable, arrow elsewhere).
+   2. Interactive default zones AND interactive children get `cursor: pointer`
+      so the hand cursor shows over links/buttons whether the link IS the
+      default zone or lives INSIDE one. `:is(...)` lets us match the default
+      zone itself (when it's an <a>/<button>/[role=button]) AND its
+      interactive descendants in one rule.
+   3. ALL descendants get `cursor: inherit` — this is the key fix. With
+      `auto` on the wildcard, text content inside a link resolved to the
+      I-beam (text cursor), overriding the link's pointer. `inherit` makes
+      descendants inherit the parent's cursor (pointer for content inside an
+      <a>, etc.), so the hand cursor shows consistently across the whole
+      link, not just on the `<a>` element itself. */
+.cursor-custom [data-cursor="default"] {
+  cursor: auto !important;
+}
+.cursor-custom :is(a, button, [role="button"], [data-cursor="hover"])[data-cursor="default"],
+.cursor-custom [data-cursor="default"] :is(a, button, [role="button"], [data-cursor="hover"]) {
+  cursor: pointer !important;
+}
+.cursor-custom [data-cursor="default"] * {
+  cursor: inherit !important;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  CUSTOM CURSOR — theoptimisticdesigner.com exact match.
+ *  Two square layers with mix-blend-mode:difference so they auto-invert
+ *  whatever sits underneath (white on dark → black on light, no per-theme
+ *  work needed):
+ *    .c-dot  — 8px solid square (snaps to cursor)
+ *    .c-ring — 30px square outline at rest, 48px + soft green on hover
+ *  The .c-ring--grow modifier (added via JS on hover over a, button,
+ *  [data-cursor="hover"]) drives the size + color transition.
+ *  Variables come from :root (see --cursor-* tokens above). Same tokens
+ *  serve both themes — the difference blend handles the inversion.
+ *
+ *  NOTE: classes are prefixed `c-` (not `cursor-`) to avoid colliding
+ *  with Tailwind's `cursor-*` utility namespace (cursor-default,
+ *  cursor-pointer, etc.) — Tailwind v4 was stripping `cursor-dot` /
+ *  `cursor-ring` rules entirely because they matched the `cursor-*`
+ *  utility prefix but weren't valid utilities.
+ * ────────────────────────────────────────────────────────────────────── */
+.c-dot,
+.c-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 100;
+  border-radius: 0;          /* square — matches the reference index page */
+  mix-blend-mode: difference;
+  will-change: transform, opacity;
+}
+
+.c-dot {
+  width: var(--cursor-dot);
+  height: var(--cursor-dot);
+  background: var(--cursor-text);   /* solid white — difference inverts */
+  transition: opacity 200ms var(--cursor-timing);
+}
+
+.c-ring {
+  width: var(--cursor-ring);
+  height: var(--cursor-ring);
+  border: 1px solid var(--cursor-border-rest);   /* white at 35% */
+  transition:
+    width var(--cursor-duration) var(--cursor-timing),
+    height var(--cursor-duration) var(--cursor-timing),
+    border-color var(--cursor-duration) var(--cursor-timing),
+    opacity 200ms var(--cursor-timing);
+}
+
+.c-ring.c-ring--grow {
+  width: var(--cursor-ring-grow);
+  height: var(--cursor-ring-grow);
+  border-color: var(--cursor-accent);   /* flat amber — drop difference */
+  mix-blend-mode: normal;
+}
+
+/* On touch devices, hide the custom cursor entirely — native cursor
+   (or no cursor on touch) is the right UX. The JS guard already prevents
+   mounting, but this is a belt-and-suspenders CSS safety net. */
+@media (pointer: coarse) {
+  .c-dot,
+  .c-ring {
+    display: none;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  COVERFLOW PROJECT CARD — glass hover (monochrome white, omkartalwalkar.com-inspired)
+ *  UNLAYERED deliberately: Tailwind's @layer utilities (border-[var(--line)]
+ *  on the card, opacity-0 on the .cover-glass overlay) sit in a higher
+ *  priority layer than @layer components, so a components-layer rule would
+ *  be overridden regardless of specificity. Unlayered normal declarations
+ *  beat every @layer, so the hover border-color + overlay opacity apply.
+ *  Side cards (no data-active) are untouched — their depth filter already
+ *  dims them, a glow there would read as noise.
+ *
+ *  Monochrome: the hover glow + border + glass tint are all WHITE now
+ *  (not the per-project accent color) so every card reads the same on
+ *  hover — a calm, uniform light, per user request. */
+.coverflow-card[data-active]:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow:
+    0 26px 70px -28px rgba(255, 255, 255, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.coverflow-card[data-active]:hover .cover-glass {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .coverflow-card[data-active]:hover { box-shadow: none; }
+  .coverflow-card[data-active]:hover .cover-glass { opacity: 0; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  REVEAL ON SCROLL — visible by default (JS-free fail-safe)
+ *  JS adds .is-visible; if JS fails, content is still shown.
+ * ────────────────────────────────────────────────────────────────────── */
+.reveal {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
+}
+.reveal.reveal-init {
+  opacity: 0;
+  transform: translateY(20px);
+}
+.reveal.reveal-init.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  REDUCED MOTION — kill all animation/transition
+ * ────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  THEME TOGGLE — circular reveal (View Transitions API)
+ *  The ThemeToggle button calls document.startViewTransition(), flips the
+ *  html class inside it, then animates ::view-transition-new(root) from a
+ *  0px circle to a full-screen circle. These rules disable the default
+ *  crossfade so ONLY our clip-path animation shows. Falls back to an
+ *  instant class swap on browsers without VT support.
+ * ────────────────────────────────────────────────────────────────────── */
+html:not(.route-transitioning)::view-transition-old(root),
+html:not(.route-transitioning)::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html:not(.route-transitioning)::view-transition-old(root) {
+  z-index: 1;
+}
+html:not(.route-transitioning)::view-transition-new(root) {
+  z-index: 9999;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not(.route-transitioning)::view-transition-old(root),
+  html:not(.route-transitioning)::view-transition-new(root) {
+    display: none;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  THEME TOGGLE — icon visibility (CSS-driven, not JS state)
+ *  The sun/moon icon swap is driven by the html.dark / html.light class
+ *  (set by the no-FOUC <script> before first paint) rather than JS
+ *  state. Default (no class / html.dark) = sun visible; html.light =
+ *  moon visible. Both SVGs render identically server-side; CSS shows
+ *  the correct one immediately based on the html class.
+ * ────────────────────────────────────────────────────────────────────── */
+.theme-icon-sun,
+.theme-icon-moon {
+  transition:
+    opacity var(--transition),
+    transform var(--transition);
+}
+/* default = dark mode: sun visible, moon hidden */
+.theme-icon-sun {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+.theme-icon-moon {
+  opacity: 0;
+  transform: scale(0) rotate(90deg);
+}
+/* light mode: sun hidden, moon visible */
+html.light .theme-icon-sun {
+  opacity: 0;
+  transform: scale(0) rotate(-90deg);
+}
+html.light .theme-icon-moon {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-icon-sun,
+  .theme-icon-moon {
+    transition: none;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  BLOG — article prose (.article-body)
+ *  Global (not scoped) because the markdown/MDX <Content /> renders
+ *  outside the page component's style scope.
+ * ────────────────────────────────────────────────────────────────────── */
+.article-body {
+  font-size: 1.02rem;
+  line-height: 1.78;
+  color: var(--ink-muted);
+}
+.article-body p {
+  margin-block: 1.15em;
+}
+.article-body > p:first-of-type {
+  margin-top: 0;
+}
+/* headings — clean typographic hierarchy, anchored for the TOC */
+.article-body h2 {
+  position: relative;
+  margin-top: 2.6em;
+  margin-bottom: 0.7em;
+  font-family: var(--font-sans);
+  font-size: clamp(1.35rem, 2.2vw, 1.6rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--ink);
+  scroll-margin-top: 110px;
+}
+.article-body h3 {
+  margin-top: 2em;
+  margin-bottom: 0.55em;
+  font-family: var(--font-sans);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  scroll-margin-top: 110px;
+}
+.article-body a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  transition: text-decoration-color var(--transition-fast);
+}
+.article-body a:hover {
+  text-decoration-color: var(--ink);
+}
+.article-body strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.article-body ul,
+.article-body ol {
+  margin-block: 1.15em;
+  padding-left: 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+}
+.article-body ul {
+  list-style: none;
+}
+.article-body ul > li {
+  position: relative;
+  padding-left: 0.35rem;
+}
+.article-body ul > li::before {
+  content: "·";
+  position: absolute;
+  left: -0.85rem;
+  color: var(--ink-faint);
+}
+.article-body ol {
+  list-style: decimal;
+}
+.article-body ol::marker,
+.article-body li::marker {
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+/* dek-style blockquote */
+.article-body blockquote {
+  margin-block: 1.6em;
+  border-left: 2px solid var(--line-strong);
+  padding: 0.2rem 0 0.2rem 1.25rem;
+  color: var(--ink-muted);
+  font-size: 1.05em;
+}
+.article-body blockquote p {
+  margin-block: 0.5em;
+}
+/* tables — hairline, mono header */
+.article-body table {
+  width: 100%;
+  margin-block: 1.8em;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.article-body th {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: left;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+.article-body td {
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+.article-body hr {
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  margin-block: 3rem;
+}
+/* inline code */
+.article-body :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  padding: 0.12em 0.4em;
+}
+/* bare images inside markdown (use <Figure> for framed + caption) */
+.article-body img {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.article-body img[data-zoomable="true"] {
+  cursor: zoom-in;
+  transition: border-color var(--transition-fast), opacity var(--transition-fast);
+}
+.article-body img[data-zoomable="true"]:hover { border-color: var(--ink-muted); }
+.article-body img[data-zoomable="true"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.article-body svg.flowchart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-block: 1.9rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ *  BLOG — code blocks (Shiki) in a terminal-window frame
+ *
+ *  Only the language label is CSS-only (::after, from the
+ *  data-language attribute Astro sets on the <pre>). No re-drawn
+ *  traffic lights. Dual-theme colors are emitted by Shiki as
+ *  --shiki-dark / --shiki-light vars (defaultColor: false) and
+ *  selected by the html class here.
+ * ────────────────────────────────────────────────────────────────────── */
+.article-body pre.astro-code {
+  position: relative;
+  margin-block: 1.9rem;
+  padding: 3rem 1.25rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  font-size: 0.82rem;
+  line-height: 1.68;
+  background: var(--shiki-dark-bg, var(--surface-2)) !important;
+}
+.article-code-block {
+  position: relative;
+}
+.article-code-copy {
+  position: absolute;
+  z-index: 1;
+  top: 0.65rem;
+  left: 0.75rem;
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+.article-code-copy:hover {
+  border-color: var(--ink-muted);
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.article-code-copy:focus-visible,
+.article-back-to-top:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 3px;
+}
+.article-code-copy[data-state="copied"] { border-color: var(--good); color: var(--good); }
+.article-code-copy[data-state="failed"] { border-color: var(--warn); color: var(--warn); }
+.article-back-to-top {
+  position: fixed;
+  right: clamp(0.85rem, 3vw, 2rem);
+  bottom: 1.25rem;
+  z-index: 50;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--ink-muted);
+  box-shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.18);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.article-back-to-top:hover {
+  border-color: var(--ink-muted);
+  background: var(--surface-2);
+  color: var(--ink);
+  transform: translateY(-2px);
+}
+.article-back-to-top[hidden] { display: none; }
+.article-body pre.astro-code code {
+  display: block;
+  font-family: var(--font-mono);
+  background: transparent !important;
+}
+/* language label */
+.article-body pre.astro-code::after {
+  content: attr(data-language);
+  position: absolute;
+  top: 0.95rem;
+  right: 1.15rem;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+/* dual-theme token colors (dark default) */
+.article-body .astro-code,
+.article-body .astro-code span {
+  color: var(--shiki-dark, inherit) !important;
+  font-style: var(--shiki-dark-font-style, inherit) !important;
+  font-weight: var(--shiki-dark-font-weight, inherit) !important;
+  text-decoration: var(--shiki-dark-text-decoration, inherit) !important;
+}
+html.light .article-body pre.astro-code {
+  background: var(--shiki-light-bg, var(--surface-2)) !important;
+}
+html.light .article-body .astro-code,
+html.light .article-body .astro-code span {
+  color: var(--shiki-light, inherit) !important;
+  font-style: var(--shiki-light-font-style, inherit) !important;
+  font-weight: var(--shiki-light-font-weight, inherit) !important;
+  text-decoration: var(--shiki-light-text-decoration, inherit) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .article-body * {
+    transition-duration: 0.001ms !important;
+  }
+}

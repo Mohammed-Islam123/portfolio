@@ -1,0 +1,86 @@
+---
+title: "hello, wire — this blog is live"
+description: "Why this blog exists, what I'll write about, and a quick tour of everything a post can do here — notes, figures, framed code."
+pubDate: 2026-08-01
+tags: ["meta", "backend"]
+thumbnail: ./thumbnail.svg
+thumbnailAlt: "Monochrome grid with a dotted field, one signal line, and a single amber packet"
+---
+
+import Note from '../../components/mdx/Note.astro';
+import Figure from '../../components/mdx/Figure.astro';
+import thumb from './thumbnail.svg';
+
+Every backend engineer keeps a notebook. Most of them live in `/tmp` and
+die with the laptop. This one lives here — notes from building systems
+that move bytes for a living.
+
+## what you'll find here
+
+Three kinds of posts, roughly:
+
+- **Decisions** — why a protocol, a data path, or a trade-off went the
+  way it did. The reasoning is the interesting part, not the code.
+- **Failures** — the 3am pages and the boring paths that fixed them.
+- **Habits** — the small tools and checks that keep the first two rare.
+
+<Note>
+  This first post doubles as a style tour — everything you see here
+  (notes, figures, code frames) is a building block for future posts.
+</Note>
+
+## the building blocks
+
+Words are markdown. Sometimes markdown isn't enough, so posts can pull
+in real components — like the note above, or a framed figure:
+
+<Figure
+  src={thumb}
+  alt="Monochrome grid with a dotted field and one amber packet on a wire"
+  caption="the house style — monochrome, one amber signal"
+/>
+
+### notes come in three flavors
+
+<Note variant="warn">
+  A **warning** is for the things that page you at 3am. Missing
+  idempotency keys, unbounded queues, `async void`.
+</Note>
+
+<Note variant="tip">
+  A **tip** is for the small habits — the one-liner checks that catch
+  the warning above before it ships.
+</Note>
+
+### code sits in a terminal, because of course it does
+
+```csharp
+// exactly-once, the boring way: an idempotency key + a unique index
+public async Task<ConsumeResult> ConsumeAsync(OutboxRow row, CancellationToken ct)
+{
+    var existing = await _readStore.FindAsync(row.IdempotencyKey, ct);
+    if (existing is not null)
+        return ConsumeResult.AlreadyApplied; // redelivery — no-op
+
+    await _readStore.ApplyAsync(row.Deserialize(), ct);
+    return ConsumeResult.Applied;
+}
+```
+
+```bash
+# the deploy checklist that actually matters
+dotnet test --filter Category=Contract
+kubectl rollout status deploy/api --timeout=90s
+```
+
+```ts
+// and sometimes the wire speaks typescript
+const res = await fetch("/api/health", { cache: "no-store" });
+if (!res.ok) throw new Error(`health: ${res.status}`);
+```
+
+## what's next
+
+A real post is already cooking — on designing data paths that survive
+their own success. Until then, the [RSS feed](/rss.xml) knows when
+something lands.

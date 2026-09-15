@@ -1,0 +1,41 @@
+---
+/**
+ * BlogBar — minimal fixed top bar for blog pages (index + articles).
+ *
+ * The landing page's NavBar is scrollspy-driven and home-only; blog
+ * pages get this lighter chrome instead: article and portfolio links on
+ * the left, and a ThemeToggle chip on the right — same glass recipe
+ * (translucent nav tokens + heavy blur).
+ */
+import ThemeToggle from "./ThemeToggle.astro";
+import UiIcon from "./icons/UiIcon.astro";
+
+const isBlogIndex = Astro.url.pathname === "/blog" || Astro.url.pathname === "/blog/";
+---
+
+<div class="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-3 px-3 pt-3 pointer-events-none">
+  <div class="flex items-center gap-2">
+    {!isBlogIndex && (
+      <a
+        href="/blog/"
+        data-sound-hover
+        class="blog-bar-chip nav-haze nav-haze--elevated pointer-events-auto inline-flex h-9 items-center gap-2 rounded-[10px] border border-[var(--line-soft)] px-3.5 font-mono text-xs tracking-[0.08em] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+      >
+        <UiIcon name="book-open" size={13} />
+        <span>all articles</span>
+      </a>
+    )}
+    <a
+      href="/"
+      data-sound-hover
+      class="blog-bar-chip nav-haze nav-haze--elevated pointer-events-auto inline-flex h-9 items-center gap-2 rounded-[10px] border border-[var(--line-soft)] px-3.5 font-mono text-xs tracking-[0.08em] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+    >
+      <UiIcon name="briefcase-business" size={13} />
+      <span>portfolio</span>
+    </a>
+  </div>
+
+  <div class="pointer-events-auto">
+    <ThemeToggle />
+  </div>
+</div>

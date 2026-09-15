@@ -1,0 +1,530 @@
+---
+/**
+ * NavBar — gorix.zip model, with a mobile hamburger + clock on the right.
+ *
+ *  ── Desktop (md+) ──────────────────────────────────────────────────
+ *  A detached, centered floating pill sits 12px from the top edge,
+ *  rounded, hairline border, translucent surface, heavy blur.
+ *  Holds the nav links (about · projects · toolkit · values · contact)
+ *  + a thin separator + ThemeToggle at the right end. The clock lives
+ *  in the Hero section on desktop (top-left, scrolls away with hero).
+ *
+ *  ── Mobile (< md) ──────────────────────────────────────────────────
+ *  Following gorix.zip's mobile pattern, the nav chrome lives in the
+ *  TOP-RIGHT corner as a compact cluster:
+ *
+ *    [clock]  [☰]      ← top-right, both glass-styled
+ *
+ *  The clock is always visible on mobile (it's "system info" — time,
+ *  timezone) so the user doesn't lose it when scrolling past the hero.
+ *  Tapping the hamburger opens a compact vertical dropdown panel
+ *  (right-aligned so it doesn't overflow the viewport) with the nav
+ *  links + a theme toggle row at the bottom.
+ *
+ *  Behaviors:
+ *    • tap hamburger → toggle open/closed
+ *    • tap a nav link → navigate + close
+ *    • tap outside → close
+ *    • Escape → close
+ *    • resize to desktop → close (avoid stale state)
+ *    • hamburger icon animates to X when open
+ *
+ *  ── Loader gate ────────────────────────────────────────────────────
+ *  Both desktop pill and mobile hamburger are HIDDEN during loading
+ *  (gated on the `loader:dismiss` event, with a 2.5s safety timeout).
+ *  The loading screen shows only the background, the clock, and the
+ *  terminal command — no nav chrome until the loader lifts. When
+ *  revealed, the nav fades + drops in.
+ *
+ *  Active-section highlighting uses a flicker-free scrollspy (stable
+ *  target-line method — see the script below).
+ *
+ *  Web Component lifecycle: connectedCallback re-runs after every
+ *  ClientRouter body swap, re-binding scrollspy to the new page's
+ *  sections and the clock to the mobile cluster.
+ */
+import { navItems } from "../config/nav";
+import { siteConfig } from "../config/site";
+import ThemeToggle from "./ThemeToggle.astro";
+import UiIcon from "./icons/UiIcon.astro";
+---
+
+<nav-bar
+  data-sections={navItems.map((n) => n.id).join(",")}
+  data-timezone={siteConfig.timezone}
+>
+  <header class="nav-header fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 pointer-events-none">
+    <!-- ── desktop pill (md+) ──────────────────────────────────────
+         centered floating pill with nav links + theme toggle.
+         hidden on mobile. -->
+    <nav
+      aria-label="primary"
+      data-lenis-prevent
+      class="nav-desktop nav-haze nav-haze--elevated pointer-events-auto hidden md:flex max-w-[calc(100vw-10rem)] items-center gap-0.5 overflow-x-auto rounded-[10px] border border-[var(--line-soft)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {
+        navItems.map((item) => (
+          <a
+            href={item.href}
+            data-nav-link={item.id}
+            class="nav-link relative shrink-0 rounded-[7px] px-3.5 py-1.5 font-mono text-xs transition-[color,background-color] [transition-duration:var(--transition-fast)]"
+          >
+            {item.label}
+          </a>
+        ))
+      }
+      <!-- route control separated from the landing-page sections -->
+      <span aria-hidden="true" class="mx-0.5 h-5 w-px shrink-0 bg-[var(--line)]"></span>
+      <a
+        href="/blog/"
+        data-blog-link
+        class="nav-blog-link shrink-0 inline-flex items-center gap-2 rounded-[7px] px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-[var(--ink-muted)] transition-[color,background-color,border-color] [transition-duration:var(--transition-fast)]"
+      >
+        <UiIcon name="book-open" size={14} />
+        <span>Blog</span>
+      </a>
+      <div class="shrink-0 px-0.5">
+        <ThemeToggle />
+      </div>
+    </nav>
+
+    <!-- ── mobile cluster (visible < md only) ──────────────────────
+         A compact cluster pinned to the TOP-RIGHT corner: clock +
+         hamburger. The clock is always visible on mobile (gorix.zip
+         shows it top-right on mobile so it doesn't scroll away with
+         the hero). Uses `ml-auto` to push the cluster to the right
+         edge of the pointer-events-none header wrapper. -->
+    <div class="pointer-events-auto ml-auto flex items-center gap-2 md:hidden">
+      <a
+        href="/blog/"
+        data-blog-link
+        class="nav-blog-mobile nav-haze nav-haze--elevated flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--line-soft)] text-[var(--ink-muted)] transition-[color,background-color,border-color] [transition-duration:var(--transition-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+        aria-label="Open blog"
+      >
+        <UiIcon name="book-open" size={16} />
+      </a>
+      <!-- clock — compact, glass-styled, always visible on mobile.
+           Shows HH:MM:SS + tz label; updated every second by the
+           script (paused when the tab is hidden). Initial placeholder
+           "--:--:--" matches the static HTML. -->
+      <div
+        aria-hidden="true"
+        class="nav-mobile-clock nav-haze nav-haze--elevated flex select-none items-center gap-1.5 rounded-[10px] border border-[var(--line-soft)] px-2.5 py-2 font-mono text-xs tracking-[0.04em] text-[var(--ink-dim)]"
+      >
+        <span class="nav-clock tabular-nums text-[var(--ink-muted)]">--:--:--</span>
+        <span class="text-[var(--ink-faint)]">{siteConfig.tzLabel}</span>
+      </div>
+
+      <!-- hamburger button — glass-styled, morphs to X when open -->
+      <button
+        type="button"
+        class="nav-burger nav-haze nav-haze--elevated flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--line-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60 transition-[border-color,background-color] [transition-duration:var(--transition-fast)]"
+        aria-label="Open menu"
+        aria-expanded="false"
+        aria-controls="mobile-nav"
+      >
+        <!-- hamburger icon — 3 lines that morph into an X when open.
+             Pure CSS: three spans + transforms on the open state. -->
+        <span class="relative block h-3.5 w-4">
+          <span class="burger-line burger-line-top absolute left-0 top-0 h-px w-full bg-[var(--ink)] transition-transform [transition-duration:200ms] [transition-timing-function:var(--ease)]"></span>
+          <span class="burger-line burger-line-mid absolute left-0 top-[7px] h-px w-full bg-[var(--ink)] transition-opacity [transition-duration:150ms]"></span>
+          <span class="burger-line burger-line-bot absolute left-0 top-[14px] h-px w-full bg-[var(--ink)] transition-transform [transition-duration:200ms] [transition-timing-function:var(--ease)]"></span>
+        </span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── mobile dropdown panel ──────────────────────────────────────
+       Right-aligned (anchored to the hamburger's right edge), glass-
+       styled like the desktop pill. Slides + fades in from the top
+       when open (per-item stagger). Closes on nav-click, outside-click,
+       or Escape. Width is capped so it doesn't span the full viewport. -->
+  <nav
+    id="mobile-nav"
+    aria-label="mobile primary"
+    class="nav-mobile-panel nav-haze nav-haze--strong nav-haze--elevated fixed right-3 top-14 z-50 w-[min(240px,calc(100vw-1.5rem))] overflow-hidden rounded-[12px] border border-[var(--line-soft)] p-1.5 md:hidden"
+    hidden
+  >
+    {
+      navItems.map((item, i) => (
+        <a
+          href={item.href}
+          data-nav-link={item.id}
+          class="nav-m-link flex items-center justify-between rounded-[8px] px-4 py-3 font-mono text-sm transition-[color,background-color] [transition-duration:var(--transition-fast)]"
+          style={`--item-delay: ${i * 35}ms;`}
+        >
+          <span class="tracking-[0.04em]">{item.label}</span>
+          <!-- active indicator — small dot on the right -->
+          <span
+            aria-hidden="true"
+            class="nav-active-dot h-1.5 w-1.5 rounded-full bg-[var(--signal)]"
+            style="box-shadow: 0 0 6px var(--signal-glow);"
+          />
+        </a>
+      ))
+    }
+    <!-- separator + theme toggle at the bottom -->
+    <div aria-hidden="true" class="my-1 mx-2 h-px bg-[var(--line)]"></div>
+    <div class="flex items-center justify-between px-4 py-2.5">
+      <span class="font-mono text-xs tracking-[0.08em] text-[var(--ink-dim)] uppercase">
+        theme
+      </span>
+      <ThemeToggle />
+    </div>
+  </nav>
+
+  <!-- backdrop — transparent click-catcher that closes the menu on
+       outside tap. Sits behind the dropdown but above page content. -->
+  <button
+    type="button"
+    aria-hidden="true"
+    tabindex="-1"
+    class="nav-backdrop fixed inset-0 z-40 cursor-default bg-transparent md:hidden"
+    hidden
+  ></button>
+</nav-bar>
+
+<script>
+  import { playSound } from "../scripts/sound-init";
+
+  /** live HH:MM:SS in a given IANA timezone; paused when hidden. */
+  function formatTime(timezone: string): string {
+    if (typeof Intl === "undefined") {
+      const d = new Date();
+      const p = (n: number) => String(n).padStart(2, "0");
+      return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+    try {
+      const parts = new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+        timeZone: timezone,
+      }).formatToParts(new Date());
+      const get = (t: string) =>
+        parts.find((p) => p.type === t)?.value ?? "00";
+      return `${get("hour")}:${get("minute")}:${get("second")}`;
+    } catch {
+      const d = new Date();
+      const p = (n: number) => String(n).padStart(2, "0");
+      return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    }
+  }
+
+  class NavBarEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+    private mobileOpen = false;
+    private revealed = false;
+
+    connectedCallback() {
+      const ids = (this.dataset.sections ?? "")
+        .split(",")
+        .filter(Boolean);
+      const offset = 80;
+
+      const header = this.querySelector<HTMLElement>(".nav-header");
+      const burger = this.querySelector<HTMLButtonElement>(".nav-burger");
+      const backdrop = this.querySelector<HTMLButtonElement>(".nav-backdrop");
+      const clock = this.querySelector<HTMLElement>(".nav-clock");
+      const links = Array.from(this.querySelectorAll<HTMLAnchorElement>("[data-nav-link]"));
+      const blogLinks = Array.from(this.querySelectorAll<HTMLAnchorElement>("[data-blog-link]"));
+
+      // The root state closes the event-listener race on refreshes: a
+      // component can connect after the loader has already dismissed.
+      const reveal = () => {
+        if (this.revealed || !header) return;
+        this.revealed = true;
+        header.style.opacity = "";
+        header.style.pointerEvents = "";
+        header.classList.add("nav-revealed");
+      };
+      if (header) {
+        header.style.opacity = "0";
+        header.style.pointerEvents = "none";
+      }
+      if (document.documentElement.dataset.loaderState !== "loading") reveal();
+      else window.addEventListener("loader:dismiss", reveal, { once: true });
+      const safety = setTimeout(reveal, 6000);
+      this.cleanupFns.push(() => {
+        window.removeEventListener("loader:dismiss", reveal);
+        clearTimeout(safety);
+      });
+
+      // ── scrollspy — stable target-line method (flicker-free) ──────
+      // On each scroll frame compute a target line at ~35% of the
+      // viewport height (never above the nav) and pick the last section
+      // whose top sits at or above that line. Monotonically stable: the
+      // active id only changes when the line crosses a boundary.
+      let spyRaf = 0;
+      const setActive = (id: string) => {
+        for (const a of links) {
+          const isActive = a.dataset.navLink === id;
+          a.classList.toggle("is-active", isActive);
+          if (isActive) a.setAttribute("aria-current", "page");
+          else a.removeAttribute("aria-current");
+        }
+      };
+      const compute = () => {
+        spyRaf = 0;
+        const els = ids
+          .map((id) => document.getElementById(id))
+          .filter((el): el is HTMLElement => Boolean(el));
+        if (!els.length) return;
+        const vh = window.innerHeight;
+        const target = window.scrollY + Math.max(offset, vh * 0.35);
+
+        let current = "";
+        for (const el of els) {
+          const top = el.getBoundingClientRect().top + window.scrollY;
+          if (top <= target) current = el.id;
+        }
+
+        // at the very bottom of the page -> clamp to last section
+        const atBottom =
+          window.innerHeight + window.scrollY >=
+          document.documentElement.scrollHeight - 6;
+        if (atBottom) current = els[els.length - 1].id;
+
+        // above the first section (hero / top) -> nothing active
+        const firstTop = els[0].getBoundingClientRect().top + window.scrollY;
+        if (window.scrollY + vh * 0.5 < firstTop) current = "";
+
+        setActive(current);
+      };
+      const onScroll = () => {
+        if (spyRaf) return;
+        spyRaf = requestAnimationFrame(compute);
+      };
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll, { passive: true });
+      compute();
+      this.cleanupFns.push(() => {
+        window.removeEventListener("scroll", onScroll);
+        window.removeEventListener("resize", onScroll);
+        cancelAnimationFrame(spyRaf);
+      });
+
+      // ── sounds ─────────────────────────────────────────────────────
+      for (const a of links) {
+        a.addEventListener("mouseenter", () => playSound("hover"));
+        a.addEventListener("click", () => {
+          playSound("click");
+          this.setMobileOpen(false);
+        });
+      }
+      for (const a of blogLinks) {
+        a.addEventListener("mouseenter", () => playSound("hover"));
+        a.addEventListener("click", () => playSound("click"));
+      }
+
+      // ── mobile clock ──────────────────────────────────────────────
+      if (clock) {
+        const tz =
+          this.getAttribute("data-timezone") ?? "Africa/Algiers";
+        const tick = () => (clock.textContent = formatTime(tz));
+        const raf = requestAnimationFrame(tick);
+        let id: ReturnType<typeof setInterval> | null = setInterval(tick, 1000);
+        const onVis = () => {
+          if (document.hidden) {
+            if (id) {
+              clearInterval(id);
+              id = null;
+            }
+          } else if (!id) {
+            tick();
+            id = setInterval(tick, 1000);
+          }
+        };
+        document.addEventListener("visibilitychange", onVis);
+        this.cleanupFns.push(() => {
+          cancelAnimationFrame(raf);
+          if (id) clearInterval(id);
+          document.removeEventListener("visibilitychange", onVis);
+        });
+      }
+
+      // ── mobile menu open/close ───────────────────────────────────
+      burger?.addEventListener("click", () => {
+        this.setMobileOpen(!this.mobileOpen);
+        playSound("click");
+      });
+      backdrop?.addEventListener("click", () => this.setMobileOpen(false));
+
+      // close on Escape
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape") this.setMobileOpen(false);
+      };
+      window.addEventListener("keydown", onKey);
+      this.cleanupFns.push(() =>
+        window.removeEventListener("keydown", onKey),
+      );
+
+      // close when resizing to desktop (avoid stale open state)
+      const mq = window.matchMedia("(min-width: 768px)");
+      const onMq = () => {
+        if (mq.matches) this.setMobileOpen(false);
+      };
+      mq.addEventListener("change", onMq);
+      this.cleanupFns.push(() => mq.removeEventListener("change", onMq));
+    }
+
+    private setMobileOpen(open: boolean) {
+      this.mobileOpen = open;
+      const burger = this.querySelector<HTMLButtonElement>(".nav-burger");
+      const panel = this.querySelector<HTMLElement>(".nav-mobile-panel");
+      const backdrop = this.querySelector<HTMLButtonElement>(".nav-backdrop");
+      if (burger) {
+        burger.setAttribute("aria-expanded", String(open));
+        burger.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+        burger.classList.toggle("is-open", open);
+      }
+      if (panel) panel.hidden = !open;
+      if (backdrop) backdrop.hidden = !open;
+      document.documentElement.classList.toggle("mobile-nav-open", open);
+      // entrance animations are keyed to `:not([hidden])` in CSS —
+      // toggling display restarts them natively on every open.
+    }
+
+    disconnectedCallback() {
+      document.documentElement.classList.remove("mobile-nav-open");
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("nav-bar", NavBarEl);
+</script>
+
+<style>
+  /* ── loader-gated entrance ────────────────────────────────────── */
+  @keyframes nav-drop {
+    from {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .nav-header.nav-revealed {
+    animation: nav-drop 500ms var(--ease) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes nav-drop {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+  }
+
+  .nav-blog-link:hover,
+  .nav-blog-mobile:hover {
+    border-color: var(--line-strong);
+    background-color: var(--surface-2);
+    color: var(--ink);
+  }
+
+  /* ── nav link states (active driven by scrollspy's .is-active) ── */
+  .nav-link {
+    color: var(--ink-muted);
+  }
+  .nav-link:hover {
+    color: var(--ink);
+  }
+  .nav-link.is-active {
+    background-color: var(--surface-3);
+    color: var(--ink);
+  }
+
+  /* ── mobile panel ─────────────────────────────────────────────── */
+  @keyframes mobile-nav-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .nav-mobile-panel:not([hidden]) {
+    animation: mobile-nav-in 240ms var(--ease) both;
+  }
+  @keyframes mobile-nav-item-in {
+    from {
+      opacity: 0;
+      transform: translateX(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .nav-m-link {
+    color: var(--ink-muted);
+  }
+  .nav-m-link:hover {
+    background-color: var(--surface-2);
+    color: var(--ink);
+  }
+  .nav-m-link.is-active {
+    background-color: var(--surface-3);
+    color: var(--ink);
+  }
+  /* per-item stagger — keyed to :not([hidden]) so every open replays
+     it (display:none → visible restarts CSS animations natively) */
+  .nav-mobile-panel:not([hidden]) .nav-m-link {
+    animation: mobile-nav-item-in 240ms var(--ease) var(--item-delay) both;
+  }
+  /* active dot only shows on the active row */
+  .nav-active-dot {
+    opacity: 0;
+  }
+  .nav-m-link.is-active .nav-active-dot {
+    opacity: 1;
+  }
+
+  /* ── hamburger surface + morph-to-X ───────────────────────────── */
+  .nav-burger.is-open {
+    border-color: var(--line-strong);
+  }
+  .nav-burger.is-open .burger-line-top {
+    transform: translateY(7px) rotate(45deg);
+  }
+  .nav-burger.is-open .burger-line-mid {
+    opacity: 0;
+  }
+  .nav-burger.is-open .burger-line-bot {
+    transform: translateY(-7px) rotate(-45deg);
+  }
+
+  /* lock page scroll when mobile nav is open — same !important
+     pattern as the loader scroll lock. */
+  :global(html.mobile-nav-open) {
+    overflow: hidden !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes mobile-nav-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    @keyframes mobile-nav-item-in {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+  }
+</style>

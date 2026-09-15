@@ -1,0 +1,71 @@
+---
+import UiIcon from "./icons/UiIcon.astro";
+---
+
+<copy-link>
+  <button class="copy-link" type="button" data-copy-link aria-label="Copy link to this post">
+    <span data-copy-icon><UiIcon name="copy" size={14} /></span>
+    <span data-copy-label>copy link</span>
+  </button>
+</copy-link>
+
+<script>
+  class CopyLink extends HTMLElement {
+    private resetTimer: number | undefined;
+
+    connectedCallback() {
+      const button = this.querySelector<HTMLButtonElement>("[data-copy-link]");
+      if (!button) return;
+      button.addEventListener("click", this.copy);
+    }
+
+    disconnectedCallback() {
+      this.querySelector<HTMLButtonElement>("[data-copy-link]")?.removeEventListener("click", this.copy);
+      window.clearTimeout(this.resetTimer);
+    }
+
+    private copy = async () => {
+      const button = this.querySelector<HTMLButtonElement>("[data-copy-link]");
+      const label = this.querySelector<HTMLElement>("[data-copy-label]");
+      if (!button || !label) return;
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        button.dataset.state = "copied";
+        label.textContent = "copied";
+      } catch {
+        button.dataset.state = "failed";
+        label.textContent = "copy unavailable";
+      }
+      window.clearTimeout(this.resetTimer);
+      this.resetTimer = window.setTimeout(() => {
+        delete button.dataset.state;
+        label.textContent = "copy link";
+      }, 1800);
+    };
+  }
+
+  customElements.define("copy-link", CopyLink);
+</script>
+
+<style>
+  .copy-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.5rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  }
+  .copy-link:hover { border-color: var(--ink-muted); background: var(--surface-2); color: var(--ink); }
+  .copy-link[data-state="copied"] { border-color: var(--good); color: var(--good); }
+  .copy-link[data-state="failed"] { border-color: var(--warn); color: var(--warn); }
+</style>

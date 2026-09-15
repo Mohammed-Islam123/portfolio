@@ -1,0 +1,99 @@
+---
+import { ClientRouter } from "astro:transitions";
+import Loader from "../components/Loader.astro";
+import RouteLoader from "../components/RouteLoader.astro";
+import "../styles/global.css";
+
+interface Props {
+  title?: string;
+  description?: string;
+  loading?: {
+    mode: "home" | "article" | "generic";
+    slug?: string;
+  } | false;
+}
+
+const {
+  title = "Mohamed Islam — Backend Engineer",
+  description = "Mohamed Islam Benyahkem — backend engineer in Algiers. Protocols, data paths, and the bits that decide 40ms vs 400ms.",
+  loading = Astro.url.pathname === "/" ? { mode: "home" } : false,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL("/og.png", Astro.site);
+---
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta
+      name="keywords"
+      content="backend engineer, system design, distributed systems, C#, .NET, Astro, portfolio"
+    />
+    <meta name="author" content="Mohamed Islam Benyahkem" />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="Mohamed Islam — blog"
+      href={new URL("rss.xml", Astro.site)}
+    />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImage} />
+
+    <ClientRouter />
+
+    <!-- no-FOUC theme script: set the html class from localStorage /
+         prefers-color-scheme BEFORE first paint so the correct palette
+         renders immediately (no white flash on dark load, no dark flash
+         on light load). Re-applied after every ClientRouter swap so a
+         stale class never leaks between pages. -->
+    <script is:inline>
+      (function () {
+        function applyTheme() {
+          try {
+            var t = localStorage.getItem("theme");
+            if (!t) {
+              t = window.matchMedia("(prefers-color-scheme: light)").matches
+                ? "light"
+                : "dark";
+            }
+            var root = document.documentElement;
+            root.classList.remove("dark", "light");
+            root.classList.add(t);
+          } catch (e) {
+            document.documentElement.classList.add("dark");
+          }
+        }
+        document.addEventListener("astro:after-swap", applyTheme);
+        applyTheme();
+      })();
+    </script>
+  </head>
+  <body class="antialiased">
+    {loading && <Loader mode={loading.mode} slug={loading.slug} />}
+    <RouteLoader />
+    <div data-page-transition-root>
+      <slot />
+    </div>
+    <script>
+      import "../scripts/smooth-scroll";
+      import "../scripts/custom-cursor";
+      import "../scripts/reveal";
+      import "../scripts/sound-init";
+      import "../scripts/route-transition";
+    </script>
+  </body>
+</html>

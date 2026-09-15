@@ -1,0 +1,347 @@
+---
+/**
+ * Values — blur-focus vertical list (img6 reference pattern).
+ *
+ * The focused value (hover/focus) is sharp and full-opacity; the others
+ * blur and dim. Its description appears in a sticky side card on
+ * desktop. On mobile, values show with their glyph + title +
+ * description in an accordion-style list (tap to expand).
+ *
+ * Each value gets a symbolic glyph that reinforces its meaning.
+ * Reduced-motion: no blur, all shown at full opacity.
+ */
+import { values } from "../config/values";
+import Section from "./primitives/Section.astro";
+import SectionLabel from "./primitives/SectionLabel.astro";
+import Reveal from "./primitives/Reveal.astro";
+import UiIcon from "./icons/UiIcon.astro";
+
+const GLYPHS: Record<string, string> = {
+  "01": "binary", // bytes over magic — read the bytes
+  "02": "pen-line", // learning out loud — write to figure it out
+  "03": "users", // team before ego — the commit the team owns
+  "04": "circle-help", // why before what — the "because ___" question
+  "05": "shield-check", // calm is a feature — logs, retries, idempotency
+  "06": "life-buoy", // help is a skill — make the next person self-sufficient
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+---
+
+<values-list data-values={JSON.stringify(values)}>
+  <Section id="values">
+    <div class="wrap">
+      <Reveal>
+        <SectionLabel>values</SectionLabel>
+      </Reveal>
+      <Reveal delay={80}>
+        <h2 class="sec-title mt-3">how I work.</h2>
+      </Reveal>
+      <Reveal delay={140}>
+        <p class="mt-3 max-w-xl font-sans text-[var(--ink-muted)]">
+          Not slogans — the rules I try to catch myself breaking. Hover one
+          to focus it.
+        </p>
+      </Reveal>
+
+      <!-- ── desktop: blur-focus list + side description ───────── -->
+      <div class="mt-12 hidden gap-12 md:grid md:grid-cols-[1.1fr_1fr]">
+        <div class="relative">
+          <!-- active track indicator — vertical line, segment at active row -->
+          <span
+            aria-hidden="true"
+            class="absolute left-0 top-0 bottom-0 w-px bg-[var(--line)]"></span>
+          <span
+            aria-hidden="true"
+            data-track
+            class="absolute left-0 w-px bg-[var(--ink)] transition-[top,height] [transition-duration:var(--transition)]"
+            style={`top: calc(${(0 * 100) / values.length}% + 1.25rem); height: calc(${100 / values.length}% - 2.5rem);`}
+          ></span>
+          <ul class="flex flex-col">
+            {
+              values.map((v, i) => (
+                <li class="relative pl-6">
+                  {/* left-border indicator on inactive items — visible even
+                      when blurred, so users can identify rows without color */}
+                  <span
+                    aria-hidden="true"
+                    class="v-row-line absolute left-0 top-5 bottom-5 w-px bg-[var(--line)]"
+                  />
+                  <button
+                    type="button"
+                    data-value={i}
+                    aria-label={`${v.title} — ${v.description}`}
+                    class="v-row group flex w-full items-baseline gap-4 border-b border-[var(--line-soft)] py-5 text-left transition-[filter,opacity,transform,color] [transition-duration:var(--transition)] blur-[1px] opacity-55 hover:blur-none hover:opacity-95"
+                  >
+                    {/* glyph */}
+                    <span
+                      class="v-glyph text-lg transition-colors [transition-duration:var(--transition)] text-[var(--ink-dim)]"
+                      aria-hidden="true"
+                    >
+                      <UiIcon name={GLYPHS[v.index] ?? "circle-help"} size={18} />
+                    </span>
+                    <span class="font-mono text-xs tabular-nums text-[var(--ink-dim)]">
+                      {v.index}
+                    </span>
+                    <span
+                      class="font-display font-semibold tracking-[-0.025em] text-[var(--ink)]"
+                      style="font-size: clamp(1.4rem, 3vw, 2.1rem);"
+                    >
+                      {v.title}
+                    </span>
+                  </button>
+                </li>
+              ))
+            }
+          </ul>
+        </div>
+
+        <!-- side description panel (sticky; content swapped by JS on
+             active change — the swap re-fires the val-in animation) -->
+        <div class="relative">
+          <div
+            class="v-card sticky top-28 overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-6"
+            data-card
+          >
+            <div data-card-body>
+              <p class="mono-label relative">
+                <span class="text-[var(--ink-dim)]">//</span>
+                <span class="text-[var(--ink)] tabular-nums" data-card-index>01</span>
+              </p>
+              <div class="relative mt-4 flex items-center gap-3">
+                <span class="text-3xl text-[var(--ink)]" aria-hidden="true" data-card-glyph>
+                  <UiIcon name={GLYPHS[values[0].index] ?? "circle-help"} size={24} />
+                </span>
+                <h3 class="font-display text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)]" data-card-title>
+                  {values[0].title}
+                </h3>
+              </div>
+              <p class="relative mt-4 font-sans text-[1.05rem] leading-[1.7] text-[var(--ink-muted)]" data-card-desc>
+                {values[0].description}
+              </p>
+              <div class="relative mt-6 flex items-center justify-between border-t border-[var(--line-soft)] pt-3 font-mono text-xs tracking-[0.16em] text-[var(--ink-dim)] uppercase">
+                <span>// principle</span>
+                <span class="tabular-nums" data-card-counter>01 / {pad(values.length)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── mobile: accordion-style list with glyphs ─────────── -->
+      <ul class="mt-8 flex flex-col md:hidden">
+        {
+          values.map((v, i) => (
+            <li class="border-b border-[var(--line-soft)]">
+              <button
+                type="button"
+                data-mvalue={i}
+                class="flex w-full items-baseline gap-3 py-5 text-left"
+              >
+                <span
+                  class="text-lg transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-dim)]"
+                  aria-hidden="true"
+                >
+                  <UiIcon name={GLYPHS[v.index] ?? "circle-help"} size={18} />
+                </span>
+                <span class="font-mono text-xs text-[var(--ink-dim)] tabular-nums">
+                  {v.index}
+                </span>
+                <span class="font-display text-lg font-semibold tracking-[-0.02em] text-[var(--ink)]">
+                  {v.title}
+                </span>
+                {/* expand/collapse indicator */}
+                <span
+                  class="m-chev ml-auto font-mono text-xs text-[var(--ink-dim)] transition-transform [transition-duration:var(--transition-fast)]"
+                  style="transform: rotate(0deg);"
+                  aria-hidden="true"
+                >
+                  <UiIcon name="chevron-right" size={12} />
+                </span>
+              </button>
+              <div
+                class="overflow-hidden transition-[max-height,opacity] [transition-duration:var(--transition)]"
+                style="max-height: 0px; opacity: 0;"
+                data-mbody
+              >
+                <p class="pb-5 pl-10 font-sans text-sm leading-[1.7] text-[var(--ink-muted)]">
+                  {v.description}
+                </p>
+              </div>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </Section>
+</values-list>
+
+<script>
+  import { playSound } from "../scripts/sound-init";
+  import { UI_ICONS } from "../lib/icons";
+
+  const GLYPHS: Record<string, string> = {
+    "01": "binary",
+    "02": "pen-line",
+    "03": "users",
+    "04": "circle-help",
+    "05": "shield-check",
+    "06": "life-buoy",
+  };
+
+  const svg = (name: string, size: number) =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[name] ?? ""}</svg>`;
+
+  class ValuesListEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      const values = JSON.parse(this.dataset.values ?? "[]") as {
+        index: string;
+        title: string;
+        description: string;
+      }[];
+      const count = values.length;
+      const pad = (n: number) => String(n).padStart(2, "0");
+
+      const track = this.querySelector<HTMLElement>("[data-track]");
+      const rows = Array.from(this.querySelectorAll<HTMLButtonElement>("[data-value]"));
+      const cardBody = this.querySelector<HTMLElement>("[data-card-body]");
+      const card = this.querySelector<HTMLElement>("[data-card]");
+      const cardIndex = card?.querySelector<HTMLElement>("[data-card-index]");
+      const cardGlyph = card?.querySelector<HTMLElement>("[data-card-glyph]");
+      const cardTitle = card?.querySelector<HTMLElement>("[data-card-title]");
+      const cardDesc = card?.querySelector<HTMLElement>("[data-card-desc]");
+      const cardCounter = card?.querySelector<HTMLElement>("[data-card-counter]");
+      const rowLines = Array.from(this.querySelectorAll<HTMLElement>(".v-row-line"));
+      const glyphs = Array.from(this.querySelectorAll<HTMLElement>(".v-glyph"));
+
+      let active = 0;
+      let reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      const renderCard = () => {
+        const v = values[active];
+        if (!v || !cardBody) return;
+        cardIndex!.textContent = v.index;
+        cardGlyph!.innerHTML = svg(GLYPHS[v.index] ?? "circle-help", 24);
+        cardTitle!.textContent = v.title;
+        cardDesc!.textContent = v.description;
+        cardCounter!.textContent = `${pad(active + 1)} / ${pad(count)}`;
+        // re-fire the val-in animation on the swapped card content
+        // (parity with the React key-remount)
+        cardBody.style.animation = "none";
+        void cardBody.offsetWidth;
+        cardBody.style.animation = "val-in 500ms var(--ease) both";
+      };
+
+      const renderRows = () => {
+        rows.forEach((row, i) => {
+          const isActive = active === i;
+          const dim = !isActive && !reduced;
+          row.classList.toggle("blur-[1px]", dim);
+          row.classList.toggle("opacity-55", dim);
+          row.classList.toggle("opacity-100", isActive);
+          if (isActive) {
+            row.classList.remove("blur-[1px]", "opacity-55");
+            row.classList.add("hover:blur-none", "hover:opacity-95");
+          } else {
+            row.classList.remove("hover:blur-none", "hover:opacity-95");
+          }
+          if (glyphs[i]) {
+            glyphs[i]!.style.color = isActive ? "var(--ink)" : "var(--ink-dim)";
+          }
+          if (rowLines[i]) {
+            rowLines[i]!.style.display = isActive ? "none" : "";
+          }
+        });
+        if (track) {
+          track.style.top = `calc(${(active * 100) / count}% + 1.25rem)`;
+          track.style.height = `calc(${100 / count}% - 2.5rem)`;
+        }
+      };
+
+      // keep reduced-motion in sync if the user toggles the OS setting
+      const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const onChange = () => {
+        reduced = mq.matches;
+        renderRows();
+      };
+      mq.addEventListener("change", onChange);
+      this.cleanupFns.push(() => mq.removeEventListener("change", onChange));
+
+      rows.forEach((row, i) => {
+        row.addEventListener("mouseenter", () => {
+          if (active !== i) {
+            active = i;
+            renderRows();
+            renderCard();
+          }
+          playSound("hover");
+        });
+        row.addEventListener("focus", () => {
+          if (active !== i) {
+            active = i;
+            renderRows();
+            renderCard();
+          }
+        });
+        row.addEventListener("click", () => {
+          active = i;
+          renderRows();
+          renderCard();
+          playSound("click");
+        });
+      });
+
+      // ── mobile accordion ─────────────────────────────────────────
+      let mobileExpanded = 0;
+      const mBtns = Array.from(this.querySelectorAll<HTMLButtonElement>("[data-mvalue]"));
+      const mBodies = Array.from(this.querySelectorAll<HTMLElement>("[data-mbody]"));
+      const mChevs = Array.from(this.querySelectorAll<HTMLElement>(".m-chev"));
+      const renderMobile = () => {
+        mBtns.forEach((btn, i) => {
+          const isOpen = mobileExpanded === i;
+          const glyph = btn.querySelector<HTMLElement>("span");
+          if (glyph) glyph.style.color = isOpen ? "var(--ink)" : "var(--ink-dim)";
+          if (mChevs[i]) {
+            mChevs[i]!.style.transform = isOpen ? "rotate(90deg)" : "rotate(0deg)";
+          }
+          if (mBodies[i]) {
+            mBodies[i]!.style.maxHeight = isOpen ? "200px" : "0px";
+            mBodies[i]!.style.opacity = isOpen ? "1" : "0";
+          }
+        });
+      };
+      mBtns.forEach((btn, i) => {
+        btn.addEventListener("click", () => {
+          mobileExpanded = mobileExpanded === i ? -1 : i;
+          renderMobile();
+          playSound("click");
+        });
+      });
+
+      renderRows();
+      renderMobile();
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("values-list", ValuesListEl);
+</script>
+
+<style>
+  @keyframes val-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+</style>

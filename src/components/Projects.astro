@@ -1,0 +1,671 @@
+---
+/**
+ * Projects — 3D "coverflow" depth carousel.
+ *
+ *  Layout
+ *  ───────
+ *  One card is centered & focused in FRONT (full size, opacity 1, no
+ *  rotation). Its neighbours sit BEHIND it with depth: pushed back on
+ *  Z, scaled down, rotated on Y away from centre, dimmed. The further
+ *  from centre, the deeper / smaller / dimmer.
+ *
+ *  Navigation
+ *  ───────────
+ *   • prev / next arrow buttons (disabled at the ends)
+ *   • clickable progress dots
+ *   • keyboard ← / → when the stage is focused
+ *   • pointer drag / swipe to move
+ *   • click a side card to focus it
+ *
+ *  Card (per spec — option "1a")
+ *  ─────────────────────────────
+ *   • Cover: ONLY the background is kept — the accent-tinted gradient
+ *     + the ghosted primary-tech logo. The top meta row (`01 / slug`)
+ *     and the status pill are REMOVED.
+ *   • Body: the category subtitle is REMOVED. The big title, the
+ *     description, the tech tags and the action links are KEPT.
+ *
+ *  No external library — the depth math is plain CSS transforms
+ *  computed from each card's offset to the active index (initial
+ *  transforms for active=0 are even rendered at build time).
+ *
+ *  The "view all" modal replaces the old Radix Dialog with a
+ *  hand-rolled dialog (~50 lines): Escape / backdrop click to close,
+ *  aria-modal, focus management.
+ */
+import { projects } from "../config/projects";
+import Section from "./primitives/Section.astro";
+import SectionLabel from "./primitives/SectionLabel.astro";
+import Reveal from "./primitives/Reveal.astro";
+import TechIcon from "./icons/TechIcon.astro";
+import UiIcon from "./icons/UiIcon.astro";
+
+/**
+ * coverflowTransform — compute the 3D transform for a card given its
+ * offset from the active card. Pure function so the math is in one
+ * auditable place.
+ *
+ *   offset 0  → centre, full size, front.
+ *   offset ±1 → one step out, scaled down, rotated, pushed back.
+ *   offset ±2 → two steps out, smaller, deeper, dimmer.
+ *   |offset|>2 → hidden (pulled off-stage, no pointer events).
+ */
+function coverflowTransform(offset: number): {
+  transform: string;
+  opacity: number;
+  zIndex: number;
+  pointerEvents: "auto" | "none";
+  filter: string;
+} {
+  const abs = Math.abs(offset);
+  if (offset === 0) {
+    // the focused, centered card — full size, in front, no rotation.
+    return {
+      transform: "translateX(0) scale(1) translateZ(0) rotateY(0)",
+      opacity: 1,
+      zIndex: 30,
+      pointerEvents: "auto",
+      filter: "brightness(1)",
+    };
+  }
+  if (abs > 2) {
+    // off-stage — this is what clamps drag past the ends and keeps far
+    // cards from intercepting pointer events.
+    return {
+      transform: `translateX(${offset > 0 ? 130 : -130}%) scale(0.5) translateZ(-400px)`,
+      opacity: 0,
+      zIndex: 0,
+      pointerEvents: "none",
+      filter: "brightness(0.4)",
+    };
+  }
+  // direction sign for X movement + rotation
+  const dir = Math.sign(offset);
+  // base offsets per ring
+  const xStep = abs === 1 ? 56 : 92; // % of card width
+  const scale = abs === 1 ? 0.82 : 0.64;
+  const z = abs === 1 ? -140 : -300; // px depth
+  const rotY = abs === 1 ? 26 : 38; // deg, away from centre
+  const opacity = abs === 1 ? 0.5 : 0.22;
+  const zIdx = abs === 1 ? 20 : 10;
+  const bright = abs === 1 ? 0.62 : 0.42;
+
+  return {
+    transform: `translateX(${dir * xStep}%) scale(${scale}) translateZ(${z}px) rotateY(${-dir * rotY}deg)`,
+    opacity,
+    zIndex: zIdx,
+    pointerEvents: "auto",
+    filter: `brightness(${bright})`,
+  };
+}
+
+const cardTransition =
+  "transform 620ms cubic-bezier(0.22,1,0.36,1), opacity 520ms var(--ease), filter 520ms var(--ease), border-color 420ms var(--ease), box-shadow 420ms var(--ease)";
+
+const count = projects.length;
+const pad = (n: number) => String(n).padStart(2, "0");
+---
+
+<project-carousel data-count={count} data-slugs={projects.map((p) => p.slug).join(",")}>
+  <Section id="projects" class="bg-[var(--bg-soft)]">
+    <div class="wrap">
+      <Reveal>
+        <SectionLabel>projects</SectionLabel>
+      </Reveal>
+      <Reveal delay={80}>
+        <h2 class="sec-title mt-3 max-w-2xl">Things I've built.</h2>
+      </Reveal>
+      <Reveal delay={140}>
+        <p class="mt-3 max-w-xl font-sans text-[var(--ink-muted)]">
+          A selection of backend work — protocols, data paths, and the
+          infrastructure that keeps them honest. Drag, swipe, or use the
+          arrows to move through the stack.
+        </p>
+      </Reveal>
+
+      <!-- ── carousel controls ─────────────────────────────────── -->
+      <div class="mt-8 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-1.5">
+          {
+            projects.map((_, i) => (
+              <button
+                type="button"
+                data-dot={i}
+                aria-label={`go to project ${i + 1}`}
+                class="h-1.5 rounded-full transition-all [transition-duration:var(--transition-fast)]"
+                style={`width: ${i === 0 ? 24 : 8}px; background: ${i === 0 ? "var(--ink)" : "var(--line)"};`}
+              />
+            ))
+          }
+        </div>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            data-open-all
+            aria-label="view all projects"
+            class="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 font-mono text-xs text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)]"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+            </svg>
+            <span>view all</span>
+          </button>
+          <!-- prev arrow -->
+          <button
+            type="button"
+            data-arrow="left"
+            aria-label="previous"
+            class="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              style="transform: rotate(180deg);"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14M13 5l7 7-7 7"></path>
+            </svg>
+          </button>
+          <!-- next arrow -->
+          <button
+            type="button"
+            data-arrow="right"
+            aria-label="next"
+            class="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h14M13 5l7 7-7 7"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- ── 3D coverflow stage ───────────────────────────────────
+           NOTE: there is intentionally NO wheel handler on the stage.
+           Page scroll must scroll the page — it should not advance the
+           focused card. Navigation stays via arrows, dots, keyboard
+           ←/→, drag/swipe, and clicking a side card.
+
+           NOTE: `data-lenis-prevent` and `touch-none` are intentionally
+           absent. They were only needed when the stage hijacked the
+           wheel. `touch-pan-y` keeps vertical page scroll native while
+           still letting us capture horizontal swipes for the drag
+           gesture. `overflow-hidden` clips the side cards that fan out
+           beyond the stage edges so they never trigger horizontal page
+           scroll on narrow viewports. -->
+      <div
+        tabindex="0"
+        role="region"
+        aria-label="projects carousel"
+        aria-roledescription="carousel"
+        aria-live="polite"
+        data-cursor="scroll"
+        class="coverflow-stage relative mt-8 h-[520px] w-full cursor-grab select-none overflow-hidden touch-pan-y outline-none active:cursor-grabbing sm:h-[500px]"
+      >
+        {
+          projects.map((p, i) => {
+            const t = coverflowTransform(i);
+            const isActive = i === 0;
+            const primaryTech = p.tech[0];
+            return (
+              <article
+                data-card
+                data-active={isActive ? "" : undefined}
+                aria-hidden={!isActive ? "true" : undefined}
+                aria-label={`${p.title} — ${p.year}`}
+                class="coverflow-card group absolute left-1/2 top-0 flex w-[86vw] max-w-[380px] -translate-x-1/2 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] [transform-style:preserve-3d] [backface-visibility:hidden] will-change-transform"
+                style={`transform: ${t.transform}; opacity: ${t.opacity}; z-index: ${t.zIndex}; pointer-events: ${t.pointerEvents}; filter: ${t.filter}; --card-accent: ${p.accent}; transition: ${cardTransition}; cursor: ${isActive ? "default" : "pointer"};`}
+              >
+                <!-- cover — ONLY the background is kept (accent gradient +
+                     ghosted primary-tech logo). -->
+                <div class="relative h-48 overflow-hidden">
+                  <!-- accent-tinted background — the card's colour identity -->
+                  <div
+                    aria-hidden="true"
+                    class="absolute inset-0"
+                    style={`background: linear-gradient(155deg, ${p.accent}22 0%, var(--surface-2) 62%, var(--surface) 100%);`}
+                  />
+                  <!-- subtle top sheen -->
+                  <div
+                    aria-hidden="true"
+                    class="absolute inset-0 opacity-60"
+                    style="background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255,255,255,0.06) 0%, transparent 70%);"
+                  />
+                  <!-- large ghosted primary tech logo -->
+                  {primaryTech && (
+                    <div class="absolute -right-3 bottom-3 opacity-[0.12] transition-opacity [transition-duration:var(--transition)] group-hover:opacity-[0.20]">
+                      <TechIcon
+                        icon={primaryTech.icon}
+                        brand={primaryTech.brand || "#9A9AA6"}
+                        size={120}
+                      />
+                    </div>
+                  )}
+                  <!-- glass hover sheen — a frosted translucent layer that
+                       blooms on hover over the cover. Sits BELOW the
+                       year/title text so the text stays sharp while the
+                       cover background frosts. Only the focused card reads
+                       as "glass" since side cards are dimmed by the depth
+                       filter. Monochrome white tint so every card reads
+                       the same on hover. -->
+                  <div
+                    aria-hidden="true"
+                    class="cover-glass pointer-events-none absolute inset-0 opacity-0 backdrop-blur-[3px] transition-opacity [transition-duration:420ms] [transition-timing-function:var(--ease)]"
+                    style="background: linear-gradient(155deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.06) 45%, transparent 100%); box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.10);"
+                  />
+                  <!-- year chip — small, bottom-right of the cover -->
+                  <div class="absolute right-4 bottom-3 font-mono text-xs tabular-nums text-[var(--ink-dim)]">
+                    {p.year}
+                  </div>
+                  <!-- bottom-left: title on the cover -->
+                  <div class="absolute bottom-3 left-4 right-16">
+                    <div class="font-display text-2xl font-bold tracking-[-0.03em] text-[var(--ink)] transition-colors [transition-duration:var(--transition)] group-hover:text-[var(--ink-soft)]">
+                      {p.title}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- body — description + tech + actions -->
+                <div class="flex flex-1 flex-col p-5">
+                  <p class="mt-1 flex-1 font-sans text-[0.92rem] leading-[1.7] text-[var(--ink-muted)]">
+                    {p.description}
+                  </p>
+
+                  <!-- tech -->
+                  <div class="mt-4 flex flex-wrap gap-1.5 pb-2">
+                    {p.tech.map((tech) => (
+                      <span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-[var(--surface-2)] px-2 py-1 font-mono text-xs text-[var(--ink-muted)]">
+                        <TechIcon icon={tech.icon} brand={tech.brand || "var(--ink-dim)"} size={12} />
+                        {tech.label}
+                      </span>
+                    ))}
+                  </div>
+
+                  <!-- actions — only the focused card exposes these (the
+                       JS toggles .actions-on; side cards sit at 40%) -->
+                  <div
+                    class={`card-actions mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--line-soft)] pt-4 font-mono text-xs transition-opacity [transition-duration:var(--transition)] ${isActive ? "opacity-100" : "opacity-40"}`}
+                  >
+                    <a
+                      href={`/projects/${p.slug}`}
+                      data-cursor="default"
+                      tabindex={isActive ? undefined : -1}
+                      class="group/act inline-flex items-center gap-1 text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
+                    >
+                      <span
+                        aria-hidden="true"
+                        class="text-[var(--ink-dim)] transition-colors transition-transform [transition-duration:var(--transition-fast)] group-hover/act:text-[var(--ink)] group-hover/act:translate-x-0.5"
+                      >
+                        <UiIcon name="chevron-right" size={12} />
+                      </span>
+                      <span class="underline-grow">case</span>
+                    </a>
+                    {p.links.map((l) => (
+                      <a
+                        href={l.href}
+                        data-cursor="default"
+                        tabindex={isActive ? undefined : -1}
+                        class="group/act inline-flex items-center gap-1 text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
+                      >
+                        <span
+                          aria-hidden="true"
+                          class="text-[var(--ink-dim)] transition-colors transition-transform [transition-duration:var(--transition-fast)] group-hover/act:text-[var(--ink)] group-hover/act:translate-x-0.5"
+                        >
+                          <UiIcon name="arrow-up-right" size={12} />
+                        </span>
+                        <span class="underline-grow">{l.label}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </article>
+            );
+          })
+        }
+      </div>
+
+      <!-- counter + active slug (helps orient on long lists) -->
+      <div class="mt-4 flex items-center justify-center gap-3 font-mono text-xs text-[var(--ink-dim)]">
+        <span class="tabular-nums" data-counter-index>01</span>
+        <span aria-hidden="true">/</span>
+        <span class="tabular-nums">{pad(count)}</span>
+        <span aria-hidden="true" class="text-[var(--ink-faint)]">·</span>
+        <span class="text-[var(--ink-muted)]" data-counter-slug>{projects[0].slug}</span>
+      </div>
+    </div>
+  </Section>
+
+  <!-- ── "view all" modal — full list of every project ──────────────
+       Opens from the "view all" button in the controls row. Each row is
+       a link to that project's detail page (/projects/[slug]). The list
+       scrolls internally (max-h) so it stays usable even once the real
+       project array grows long. Hand-rolled replacement for the old
+       Radix Dialog: Escape / backdrop click closes, aria-modal, focus
+       moves into the panel and restores to the opener on close. -->
+  <div class="pm-root" hidden>
+    <div class="pm-overlay fixed inset-0 z-50 bg-black/80" data-close-all></div>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="all projects"
+      class="pm-panel fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] p-0 shadow-lg sm:max-w-2xl"
+      tabindex="-1"
+    >
+      <div class="flex items-center justify-between border-b border-[var(--line-soft)] px-5 py-4">
+        <div class="flex items-center gap-3">
+          <span class="font-mono text-sm tracking-[0.08em] text-[var(--ink)] uppercase">
+            all projects
+          </span>
+          <span class="font-mono text-xs tabular-nums text-[var(--ink-dim)]">
+            {pad(count)}
+          </span>
+        </div>
+        <span class="sr-only">A list of all projects. Select a project to open its write-up.</span>
+        <span class="font-mono text-xs tracking-[0.18em] text-[var(--ink-faint)] uppercase">
+          esc to close
+        </span>
+      </div>
+      <div
+        data-lenis-prevent
+        class="max-h-[calc(85vh-64px)] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--line)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--line)] [&::-webkit-scrollbar-track]:bg-transparent"
+      >
+        {
+          projects.map((p, i) => (
+            <a
+              href={`/projects/${p.slug}`}
+              class={`group/row relative flex flex-col gap-3 border-b border-[var(--line)] px-5 py-5 transition-[background-color] [transition-duration:var(--transition-fast)] last:border-b-0 hover:bg-[var(--surface-3)] ${i % 2 === 1 ? "bg-white/[0.018]" : ""}`}
+            >
+              <!-- left accent rail — invisible at rest, lights up on hover
+                   to anchor the row you're pointing at. -->
+              <span
+                aria-hidden="true"
+                class="absolute left-0 top-0 bottom-0 w-[2px] bg-[var(--ink)] opacity-0 transition-opacity [transition-duration:var(--transition-fast)] group-hover/row:opacity-100"
+              />
+              <div class="flex items-baseline gap-3">
+                <span class="font-mono text-xs tabular-nums text-[var(--ink-dim)] transition-colors [transition-duration:var(--transition-fast)] group-hover/row:text-[var(--ink)]">
+                  {pad(i + 1)}
+                </span>
+                <span class="font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)] transition-colors [transition-duration:var(--transition-fast)] group-hover/row:text-[var(--ink-soft)]">
+                  {p.title}
+                </span>
+                <span class="ml-auto font-mono text-xs tabular-nums text-[var(--ink-dim)]">
+                  {p.year}
+                </span>
+                <span
+                  aria-hidden="true"
+                  class="text-[var(--ink-dim)] transition-[transform,color] [transition-duration:var(--transition-fast)] group-hover/row:translate-x-1 group-hover/row:text-[var(--ink)]"
+                >
+                  <UiIcon name="arrow-up-right" size={14} />
+                </span>
+              </div>
+              <p class="ml-7 font-sans text-[0.88rem] leading-[1.6] text-[var(--ink-muted)]">
+                {p.description}
+              </p>
+              <div class="ml-7 flex flex-wrap gap-1.5">
+                {p.tech.map((t) => (
+                  <span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 font-mono text-xs text-[var(--ink-muted)]">
+                    <TechIcon icon={t.icon} brand={t.brand || "var(--ink-dim)"} size={12} />
+                    {t.label}
+                  </span>
+                ))}
+              </div>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</project-carousel>
+
+<script>
+  import { playSound } from "../scripts/sound-init";
+
+  /** coverflowTransform — must stay in sync with the frontmatter copy
+   *  (the frontmatter one renders the initial active=0 state at build
+   *  time; this one re-computes on navigation). */
+  function coverflowTransform(offset: number) {
+    const abs = Math.abs(offset);
+    if (offset === 0) {
+      return {
+        transform: "translateX(0) scale(1) translateZ(0) rotateY(0)",
+        opacity: 1,
+        zIndex: 30,
+        pointerEvents: "auto" as const,
+        filter: "brightness(1)",
+      };
+    }
+    if (abs > 2) {
+      return {
+        transform: `translateX(${offset > 0 ? 130 : -130}%) scale(0.5) translateZ(-400px)`,
+        opacity: 0,
+        zIndex: 0,
+        pointerEvents: "none" as const,
+        filter: "brightness(0.4)",
+      };
+    }
+    const dir = Math.sign(offset);
+    const xStep = abs === 1 ? 56 : 92;
+    const scale = abs === 1 ? 0.82 : 0.64;
+    const z = abs === 1 ? -140 : -300;
+    const rotY = abs === 1 ? 26 : 38;
+    const opacity = abs === 1 ? 0.5 : 0.22;
+    const zIdx = abs === 1 ? 20 : 10;
+    const bright = abs === 1 ? 0.62 : 0.42;
+    return {
+      transform: `translateX(${dir * xStep}%) scale(${scale}) translateZ(${z}px) rotateY(${-dir * rotY}deg)`,
+      opacity,
+      zIndex: zIdx,
+      pointerEvents: "auto" as const,
+      filter: `brightness(${bright})`,
+    };
+  }
+
+  class ProjectCarousel extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+    private active = 0;
+    private count = 0;
+    private slugs: string[] = [];
+    private modalOpen = false;
+    private opener: HTMLElement | null = null;
+    private drag: { x: number; moved: number } | null = null;
+
+    connectedCallback() {
+      this.count = Number(this.dataset.count ?? 0);
+      this.slugs = (this.dataset.slugs ?? "").split(",").filter(Boolean);
+
+      const stage = this.querySelector<HTMLElement>(".coverflow-stage");
+      const cards = Array.from(this.querySelectorAll<HTMLElement>("[data-card]"));
+      const dots = Array.from(this.querySelectorAll<HTMLButtonElement>("[data-dot]"));
+      const arrowL = this.querySelector<HTMLButtonElement>('[data-arrow="left"]');
+      const arrowR = this.querySelector<HTMLButtonElement>('[data-arrow="right"]');
+      const counterIdx = this.querySelector<HTMLElement>("[data-counter-index]");
+      const counterSlug = this.querySelector<HTMLElement>("[data-counter-slug]");
+      const openBtn = this.querySelector<HTMLButtonElement>("[data-open-all]");
+      const pad = (n: number) => String(n).padStart(2, "0");
+
+      const clamp = (n: number) => Math.max(0, Math.min(this.count - 1, n));
+
+      const render = () => {
+        cards.forEach((card, i) => {
+          const offset = i - this.active;
+          const t = coverflowTransform(offset);
+          const isActive = offset === 0;
+          card.style.transform = t.transform;
+          card.style.opacity = String(t.opacity);
+          card.style.zIndex = String(t.zIndex);
+          card.style.pointerEvents = t.pointerEvents;
+          card.style.filter = t.filter;
+          card.style.cursor = isActive ? "default" : "pointer";
+          if (isActive) card.setAttribute("data-active", "");
+          else card.removeAttribute("data-active");
+          if (isActive) card.removeAttribute("aria-hidden");
+          else card.setAttribute("aria-hidden", "true");
+          card.querySelectorAll("a").forEach((l) => {
+            (l as HTMLAnchorElement).tabIndex = isActive ? 0 : -1;
+          });
+          const actions = card.querySelector(".card-actions");
+          actions?.classList.toggle("opacity-100", isActive);
+          actions?.classList.toggle("opacity-40", !isActive);
+        });
+        dots.forEach((dot, i) => {
+          dot.style.width = i === this.active ? "24px" : "8px";
+          dot.style.background =
+            i === this.active ? "var(--ink)" : "var(--line)";
+        });
+        if (arrowL) arrowL.disabled = this.active === 0;
+        if (arrowR) arrowR.disabled = this.active === this.count - 1;
+        if (counterIdx) counterIdx.textContent = pad(this.active + 1);
+        if (counterSlug) counterSlug.textContent = this.slugs[this.active] ?? "";
+      };
+
+      const go = (dir: 1 | -1) => {
+        const next = clamp(this.active + dir);
+        if (next !== this.active) {
+          playSound("click");
+          this.active = next;
+          render();
+        }
+      };
+      const goTo = (i: number) => {
+        const next = clamp(i);
+        if (next !== this.active) {
+          playSound("click");
+          this.active = next;
+          render();
+        }
+      };
+
+      // ── controls ─────────────────────────────────────────────────
+      arrowL?.addEventListener("click", () => go(-1));
+      arrowR?.addEventListener("click", () => go(1));
+      dots.forEach((dot) =>
+        dot.addEventListener("click", () => goTo(Number(dot.dataset.dot))),
+      );
+      openBtn?.addEventListener("mouseenter", () => playSound("hover"));
+      openBtn?.addEventListener("click", () => {
+        this.setModal(true);
+        playSound("click");
+      });
+
+      // ── keyboard ←/→ when the stage is focused ───────────────────
+      stage?.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          go(1);
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          go(-1);
+        }
+      });
+
+      // ── pointer drag / swipe ─────────────────────────────────────
+      stage?.addEventListener("pointerdown", (e) => {
+        this.drag = { x: e.clientX, moved: 0 };
+        try {
+          stage.setPointerCapture(e.pointerId);
+        } catch {
+          /* pointer already released */
+        }
+      });
+      stage?.addEventListener("pointermove", (e) => {
+        if (!this.drag) return;
+        this.drag.moved = e.clientX - this.drag.x;
+      });
+      const endDrag = () => {
+        if (!this.drag) return;
+        const m = this.drag.moved;
+        this.drag = null;
+        if (Math.abs(m) > 60) go(m < 0 ? 1 : -1);
+      };
+      stage?.addEventListener("pointerup", endDrag);
+      stage?.addEventListener("pointercancel", endDrag);
+
+      // ── card hover sound + click-to-focus ────────────────────────
+      cards.forEach((card, i) => {
+        card.addEventListener("mouseenter", () => playSound("hover"));
+        card.addEventListener("click", () => {
+          if (i !== this.active) goTo(i);
+        });
+      });
+
+      // ── "view all" modal ─────────────────────────────────────────
+      this.querySelector("[data-close-all]")?.addEventListener("click", () =>
+        this.setModal(false),
+      );
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === "Escape" && this.modalOpen) this.setModal(false);
+      };
+      window.addEventListener("keydown", onKey);
+      this.cleanupFns.push(() => {
+        window.removeEventListener("keydown", onKey);
+        // safety net if the element disconnects while open
+        if (this.modalOpen) {
+          document.body.style.overflow = "";
+        }
+      });
+
+      render();
+    }
+
+    // Lock body scroll while the modal is open (the modal list scrolls
+    // independently via its own overflow-y-auto).
+    private setModal(open: boolean) {
+      this.modalOpen = open;
+      const modal = this.querySelector<HTMLElement>(".pm-root");
+      const modalPanel = this.querySelector<HTMLElement>(".pm-panel");
+      if (open) {
+        this.opener = document.activeElement as HTMLElement | null;
+        document.body.style.overflow = "hidden";
+        modal?.removeAttribute("hidden");
+        modalPanel?.focus();
+      } else {
+        document.body.style.overflow = "";
+        modal?.setAttribute("hidden", "");
+        this.opener?.focus?.();
+      }
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((fn) => fn());
+      this.cleanupFns = [];
+    }
+  }
+
+  customElements.define("project-carousel", ProjectCarousel);
+</script>
+
+<style>
+  .coverflow-stage {
+    perspective: 1400px;
+    perspective-origin: 50% 45%;
+  }
+</style>

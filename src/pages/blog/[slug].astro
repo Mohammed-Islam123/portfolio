@@ -1,0 +1,197 @@
+---
+import { render } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import BlogBar from "../../components/BlogBar.astro";
+import ReadingProgress from "../../components/ReadingProgress.astro";
+import Toc from "../../components/Toc.astro";
+import CopyLink from "../../components/CopyLink.astro";
+import RelatedPosts from "../../components/RelatedPosts.astro";
+import PostNav from "../../components/PostNav.astro";
+import ArticleTools from "../../components/ArticleTools.astro";
+import ArticleImageLightbox from "../../components/mdx/ArticleImageLightbox.astro";
+import { formatDate, getPosts, getRelatedPosts, readingTimeMinutes, tagSlug, wordCount, type Post } from "../../lib/blog";
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  return posts.map((post, index) => ({
+    params: { slug: post.id },
+    props: {
+      post,
+      previous: index > 0 ? posts[index - 1] : null,
+      next: index < posts.length - 1 ? posts[index + 1] : null,
+    },
+  }));
+}
+
+const { post, previous, next } = Astro.props as {
+  post: Post;
+  previous: Post | null;
+  next: Post | null;
+};
+const { Content, headings } = await render(post);
+const posts = await getPosts();
+const related = getRelatedPosts(post, posts);
+const { title, description, pubDate, tags, thumbnail } = post.data;
+const words = wordCount(post.body ?? "");
+const minutes = readingTimeMinutes(post.body ?? "");
+const heroImage = thumbnail?.src;
+---
+
+<Layout
+  title={`${title} · Mohamed Islam`}
+  description={description}
+  loading={{ mode: "article", slug: post.id }}
+>
+  <BlogBar />
+  <ReadingProgress />
+
+  {heroImage && (
+    <article-hero class="article-hero" style={`--article-image:url('${heroImage}')`} aria-hidden="true">
+      <div class="article-hero__image"></div>
+      <div class="article-hero__tint"></div>
+      <div class="article-hero__wash"></div>
+    </article-hero>
+    <div class="article-hero__blur" data-article-hero-blur aria-hidden="true"></div>
+  )}
+
+  <main class="article-page">
+    <article class="article-shell">
+      <div class="article-shell__offset"></div>
+      <div class="wrap article-shell__wrap">
+        <header class="article-header">
+          <nav class="article-header__crumb" aria-label="Breadcrumb">
+            <a href="/">Home</a><span aria-hidden="true">/</span><a href="/blog/">Blog</a><span aria-hidden="true">/</span><span>{post.id}</span>
+          </nav>
+          <h1>{title}</h1>
+          <p class="article-header__dek">{description}</p>
+          <div class="article-header__meta">
+            <time datetime={pubDate.toISOString()}>{formatDate(pubDate)}</time><span aria-hidden="true">·</span><span>{words} words</span><span aria-hidden="true">·</span><span>{minutes} min read</span>
+          </div>
+          {tags.length > 0 && (
+            <ul class="article-header__tags" aria-label="Post tags">
+              {tags.map((tag) => <li><a href={`/blog/tags/${tagSlug(tag)}/`}>{tag}</a></li>)}
+            </ul>
+          )}
+        </header>
+
+        <Toc headings={headings} variant="box" />
+
+        <div class="article-layout">
+          <div class="article-body">
+            <ArticleImageLightbox><Content /></ArticleImageLightbox>
+            <div class="article-body__share"><CopyLink /></div>
+            <RelatedPosts posts={related} />
+            <PostNav {previous} {next} />
+          </div>
+          <aside class="article-layout__toc"><Toc headings={headings} variant="rail" /></aside>
+        </div>
+      </div>
+    </article>
+  </main>
+  <ArticleTools />
+</Layout>
+
+<script>
+  class ArticleHero extends HTMLElement {
+    private abort?: AbortController;
+    private frame = 0;
+
+    connectedCallback() {
+      this.abort?.abort();
+      this.abort = new AbortController();
+      const blurLayer = document.querySelector<HTMLElement>("[data-article-hero-blur]");
+
+      // Astro's CSS pipeline emits only the legacy prefixed form here, which
+      // Chromium does not apply to this transparent overlay. Set the standard
+      // property directly so the backdrop is genuinely blurred.
+      blurLayer?.style.setProperty("backdrop-filter", "blur(40px)");
+
+      const update = () => {
+        this.frame = 0;
+        blurLayer?.style.setProperty("--article-hero-blur", String(Math.min(1, window.scrollY / 360)));
+      };
+      const onScroll = () => {
+        if (!this.frame) this.frame = requestAnimationFrame(update);
+      };
+
+      window.addEventListener("scroll", onScroll, { passive: true, signal: this.abort.signal });
+      update();
+    }
+
+    disconnectedCallback() {
+      this.abort?.abort();
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+    }
+  }
+
+  if (!customElements.get("article-hero")) customElements.define("article-hero", ArticleHero);
+</script>
+
+<style>
+  .article-hero {
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 0;
+    display: block;
+    height: 800px;
+    overflow: hidden;
+    pointer-events: none;
+    background: var(--bg);
+  }
+  .article-hero__image,
+  .article-hero__tint,
+  .article-hero__wash { position: absolute; inset: 0; }
+  .article-hero__image {
+    background: var(--article-image) 50% / cover no-repeat;
+    filter: var(--article-hero-image-filter);
+  }
+  .article-hero__image {
+    opacity: var(--article-hero-image-opacity);
+  }
+  .article-hero__blur {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    height: 100svh;
+    pointer-events: none;
+    opacity: var(--article-hero-blur, 0);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+  }
+  .article-hero__tint { background: var(--article-hero-tint); }
+  .article-hero__wash {
+    background: linear-gradient(
+      to bottom,
+      var(--article-hero-wash-start),
+      var(--article-hero-wash-end) 78%,
+      var(--bg)
+    );
+  }
+
+  .article-page { position: relative; z-index: 1; min-height: 100svh; }
+  .article-shell { padding-bottom: 4rem; }
+  .article-shell__offset { height: clamp(15.5rem, 62vw, 18rem); }
+  .article-shell__wrap { max-width: 72rem; }
+  .article-header { max-width: 44rem; }
+  .article-header__crumb { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 1rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-dim); }
+  .article-header__crumb a { color: var(--ink-muted); text-decoration: none; }
+  .article-header__crumb a:hover { color: var(--ink); }
+  .article-header h1 { margin: 0; font-family: var(--font-display); font-size: clamp(2.3rem, 6vw, 4.1rem); font-weight: 650; letter-spacing: -0.055em; line-height: 0.98; color: var(--ink); overflow-wrap: anywhere; }
+  .article-header__dek { margin: 1rem 0 0; color: var(--ink-soft); font-size: clamp(1rem, 1.8vw, 1.2rem); line-height: 1.6; }
+  .article-header__meta { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 1rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-dim); }
+  .article-header__tags { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0.9rem 0 0; padding: 0; list-style: none; }
+  .article-header__tags a { display: inline-flex; padding: 0.18rem 0.55rem; border: 1px solid var(--line); border-radius: var(--radius-full); font-family: var(--font-mono); font-size: 0.6875rem; letter-spacing: 0.06em; color: var(--ink-muted); text-decoration: none; transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast); }
+  .article-header__tags a:hover { border-color: var(--ink-muted); background: var(--surface-2); color: var(--ink); }
+  .article-layout { display: grid; grid-template-columns: minmax(0, 44rem); gap: 3rem; margin-top: 2.5rem; }
+  .article-layout__toc { display: none; }
+  .article-body { min-width: 0; padding: 2rem 0 0; border-top: 1px solid var(--line-soft); }
+  .article-body__share { margin-top: 3rem; }
+
+  @media (min-width: 768px) { .article-shell__offset { height: clamp(22rem, 31vw, 25rem); } }
+  @media (min-width: 1280px) {
+    .article-layout { grid-template-columns: minmax(0, 44rem) minmax(0, 16rem); gap: 4rem; }
+    .article-layout__toc { display: block; }
+  }
+  @media (prefers-reduced-motion: reduce) { .article-hero__blur { display: none; } }
+</style>

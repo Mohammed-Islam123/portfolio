@@ -1,0 +1,107 @@
+---
+/**
+ * Progressive enhancement for article images. It makes Markdown and MDX
+ * images keyboard-accessible, then opens the original asset in a native
+ * dialog. Without JavaScript, every image remains a normal inline image.
+ */
+---
+
+<article-image-lightbox>
+  <slot />
+  <dialog class="article-image-dialog" aria-label="Expanded article image">
+    <button class="article-image-dialog__close" type="button" aria-label="Close expanded image">close</button>
+    <img class="article-image-dialog__image" alt="" />
+    <p class="article-image-dialog__caption"></p>
+  </dialog>
+</article-image-lightbox>
+
+<script>
+  class ArticleImageLightbox extends HTMLElement {
+    private abort?: AbortController;
+    private dialog?: HTMLDialogElement;
+    private dialogImage?: HTMLImageElement;
+    private caption?: HTMLParagraphElement;
+
+    connectedCallback() {
+      this.abort?.abort();
+      this.abort = new AbortController();
+      this.dialog = this.querySelector<HTMLDialogElement>(".article-image-dialog") ?? undefined;
+      this.dialogImage = this.querySelector<HTMLImageElement>(".article-image-dialog__image") ?? undefined;
+      this.caption = this.querySelector<HTMLParagraphElement>(".article-image-dialog__caption") ?? undefined;
+
+      this.querySelectorAll<HTMLImageElement>("img:not(.article-image-dialog__image)").forEach((image) => {
+        image.dataset.zoomable = "true";
+        image.tabIndex = 0;
+        image.setAttribute("role", "button");
+        image.setAttribute("aria-label", `Open image: ${image.alt || "article image"}`);
+      });
+
+      this.addEventListener("click", this.onClick, { signal: this.abort.signal });
+      this.addEventListener("keydown", this.onKeyDown, { signal: this.abort.signal });
+    }
+
+    disconnectedCallback() {
+      this.abort?.abort();
+      if (this.dialog?.open) this.dialog.close();
+    }
+
+    private onClick = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      if (target.closest(".article-image-dialog__close")) {
+        this.dialog?.close();
+        return;
+      }
+      if (target === this.dialog) {
+        this.dialog?.close();
+        return;
+      }
+
+      const image = target.closest<HTMLImageElement>("img[data-zoomable]");
+      if (image) this.open(image);
+    };
+
+    private onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement) || target.dataset.zoomable !== "true") return;
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      this.open(target);
+    };
+
+    private open(image: HTMLImageElement) {
+      if (!this.dialog || !this.dialogImage || !this.caption) return;
+      this.dialogImage.src = image.currentSrc || image.src;
+      this.dialogImage.alt = image.alt;
+      this.caption.textContent = image.alt;
+      if (!this.dialog.open) this.dialog.showModal();
+    }
+  }
+
+  if (!customElements.get("article-image-lightbox")) {
+    customElements.define("article-image-lightbox", ArticleImageLightbox);
+  }
+</script>
+
+<style>
+  article-image-lightbox { display: block; }
+  .article-image-dialog {
+    width: min(92vw, 76rem);
+    max-width: none;
+    max-height: 92svh;
+    margin: auto;
+    padding: 0.8rem;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 0.35);
+  }
+  .article-image-dialog::backdrop { background: rgb(0 0 0 / 0.7); backdrop-filter: blur(5px); }
+  .article-image-dialog__image { display: block; width: auto; max-width: 100%; max-height: calc(92svh - 4.5rem); margin: 0 auto; border-radius: calc(var(--radius-sm) - 2px); }
+  .article-image-dialog__close { display: block; margin: 0 0 0.65rem auto; border: 0; background: transparent; font: 600 0.6875rem var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); cursor: pointer; }
+  .article-image-dialog__close:hover { color: var(--ink); }
+  .article-image-dialog__caption { margin: 0.7rem 0 0; text-align: center; font: 0.75rem/1.5 var(--font-mono); color: var(--ink-muted); }
+</style>

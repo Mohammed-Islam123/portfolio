@@ -1,0 +1,377 @@
+---
+title: "Concurrency in C#: async, Parallel, and Channels"
+description: "A practical tour of C#'s concurrency primitives — when to reach for async/await, when to use Parallel, and when channels are the right tool."
+pubDate: 2025-10-01
+tags: ["C#", "Async", "Concurrency", "Backend", "Best Practices"]
+thumbnail: ./feature.svg
+thumbnailAlt: "Concurrency in C# — feature illustration"
+draft: false
+---
+
+import Note from '../../../components/mdx/Note.astro';
+import Figure from '../../../components/mdx/Figure.astro';
+import featureImg from './feature.svg';
+
+C# has, over the years, accumulated four distinct concurrency models:
+threads, `async`/`await`, the TPL (`Parallel.For`, `Task.WhenAll`), and
+channels. Each one solves a different problem. Most concurrency bugs I
+see in production come from using the wrong one — reaching for `async`
+when the work is CPU-bound, or `Parallel.For` when the work is I/O-bound,
+or threads when neither is appropriate.
+
+This post is a tour of the four, with notes on when each is the right
+tool. By the end you should be able to look at a piece of code and say
+"this should be `async`" or "this should be a channel" without thinking
+too hard.
+
+## The four models at a glance
+
+| Model | Best for | Cost | Cancellation |
+|---|---|---|---|
+| `async`/`await` | I/O-bound (network, disk, DB) | Low (thread pool) | `CancellationToken` |
+| `Parallel.For` / `Parallel.ForEach` | CPU-bound, data-parallel | Medium (partitioner) | `ParallelOptions.CancellationToken` |
+| `Task.Run` + `Task.WhenAll` | Mixed, fan-out / fan-in | Low | `CancellationToken` |
+| `Channel<T>` | Producer/consumer pipelines | Very low | `CancellationToken` |
+
+<Note variant="note">
+The table is a starting point, not a rulebook. The right model depends
+on the shape of your data, your latency requirements, and how much
+backpressure you need. Read the tradeoffs below before picking.
+</Note>
+
+## async/await — the I/O workhorse
+
+`async`/`await` is the right choice when your code is **waiting on
+something external** — a database query, an HTTP call, a file read.
+The compiler transforms your method into a state machine that yields
+control back to the caller when it hits an `await`, freeing the thread
+to do other work. When the awaited operation completes, the continuation
+runs on a thread pool thread (or the captured `SynchronizationContext`,
+in UI apps).
+
+```csharp
+public async Task<User> FetchUserAsync(int id, CancellationToken ct)
+{
+    using var conn = new SqlConnection(_connStr);
+    await conn.OpenAsync(ct);
+    using var cmd = new SqlCommand("SELECT * FROM Users WHERE Id = @id", conn);
+    cmd.Parameters.AddWithValue("@id", id);
+    using var reader = await cmd.ExecuteReaderAsync(ct);
+    if (!await reader.ReadAsync(ct)) return null;
+    return new User
+    {
+        Id = reader.GetInt32(0),
+        Name = reader.GetString(1),
+        Email = reader.GetString(2),
+    };
+}
+```
+
+Three things to notice:
+
+1. **`CancellationToken` is threaded through every async call.** This
+   is non-negotiable. Without it, you can't cancel a slow query when
+   the user gives up.
+2. **`using` works with async.** The connection is disposed when the
+   method exits, even on exception.
+3. **No `Task.Run` anywhere.** The work is I/O-bound — wrapping it in
+   `Task.Run` would just waste a thread pool thread.
+
+<Note variant="warn">
+The classic async anti-pattern is `async void`. It's legal in only two
+places: event handlers and `Main` (before C# 7.1). Everywhere else, it
+breaks error propagation, makes the method uncancellable, and prevents
+the caller from awaiting. Use `async Task` instead.
+</Note>
+
+### Pitfall: `.Result` and `.Wait()`
+
+The single most common deadlock in C# async code is calling `.Result`
+or `.Wait()` on an async method from a context that has a
+`SynchronizationContext` (e.g. an ASP.NET classic request, a UI thread).
+The continuation needs to run on the captured context, but the context
+is blocked waiting for the result — classic deadlock.
+
+```csharp
+// ❌ Deadlock waiting to happen in ASP.NET classic or UI apps
+public string GetUser(int id)
+{
+    var user = FetchUserAsync(id).Result;  // blocks the calling thread
+    return user.Name;                       // never runs
+}
+
+// ✅ Propagate async all the way up
+public async Task<string> GetUserNameAsync(int id)
+{
+    var user = await FetchUserAsync(id);
+    return user.Name;
+}
+```
+
+If you absolutely must block on async (e.g. calling from a sync
+constructor), use `Task.Run(() => FetchUserAsync(id)).Result` — but
+this is a smell. Constructors shouldn't do I/O.
+
+## Parallel.For — the CPU workhorse
+
+`Parallel.For` is for **CPU-bound, data-parallel** work — applying the
+same computation to many independent inputs. It partitions the input
+range across thread pool threads and blocks until all complete.
+
+```csharp
+// Compute SHA-256 of 10,000 files in parallel
+public Dictionary<string, byte[]> HashAll(string[] paths)
+{
+    var results = new ConcurrentDictionary<string, byte[]>();
+    var options = new ParallelOptions
+    {
+        MaxDegreeOfParallelism = Environment.ProcessorCount,
+        CancellationToken = _ct,
+    };
+    Parallel.ForEach(paths, options, path =>
+    {
+        using var stream = File.OpenRead(path);
+        using var sha = SHA256.Create();
+        var hash = sha.ComputeHash(stream);
+        results[path] = hash;
+    });
+    return new Dictionary<string, byte[]>(results);
+}
+```
+
+<Note variant="tip">
+`Parallel.ForEach` is the right choice when you have a fixed collection
+of CPU-bound work. If your work is I/O-bound, use `Task.WhenAll` instead
+— `Parallel.ForEach` will block thread pool threads waiting on I/O,
+which is exactly what `async` was designed to avoid.
+</Note>
+
+### Pitfall: shared mutable state
+
+The biggest mistake with `Parallel.For` is writing to a shared
+collection without synchronization. The code below has a race condition:
+
+```csharp
+// ❌ Race condition — List<T> is not thread-safe
+var results = new List<byte[]>();
+Parallel.ForEach(paths, path =>
+{
+    var hash = HashFile(path);
+    results.Add(hash);  // 💥 may corrupt the list
+});
+```
+
+Two fixes:
+
+1. **`ConcurrentDictionary`** (as in the example above) — thread-safe
+   for concurrent writes.
+2. **`Parallel.For` overload with thread-local state** — the partitioner
+   gives each thread its own buffer, then merges at the end. More
+   efficient for large collections:
+
+```csharp
+// ✅ Thread-local buffer, merged at the end
+var results = Parallel.For(0, paths.Length,
+    () => new List<byte[]>(),                  // local init
+    (i, state, local) =>
+    {
+        local.Add(HashFile(paths[i]));
+        return local;
+    },
+    local =>                                   // local finally
+    {
+        lock (results) results.AddRange(local);
+    }
+);
+```
+
+## Task.Run + Task.WhenAll — fan-out / fan-in
+
+When you have a **fixed number of heterogeneous tasks** — call three
+APIs in parallel, then combine the results — `Task.WhenAll` is the
+right tool.
+
+```csharp
+public async Task<Dashboard> BuildDashboardAsync(int userId, CancellationToken ct)
+{
+    var profileTask = _api.GetProfileAsync(userId, ct);
+    var ordersTask = _api.GetOrdersAsync(userId, ct);
+    var notificationsTask = _api.GetNotificationsAsync(userId, ct);
+
+    await Task.WhenAll(profileTask, ordersTask, notificationsTask);
+
+    return new Dashboard
+    {
+        Profile = await profileTask,
+        Orders = await ordersTask,
+        Notifications = await notificationsTask,
+    };
+}
+```
+
+Each task runs concurrently. `Task.WhenAll` awaits all of them, and
+throws an `AggregateException` if any failed (with all the inner
+exceptions preserved). The `await profileTask` calls after are
+synchronous — the task is already complete.
+
+<Note variant="note">
+Don't wrap each call in `Task.Run` for I/O-bound work. `Task.Run`
+schedules work on a thread pool thread, which is wasted when the task
+just awaits I/O. Call the async methods directly — they return
+already-running tasks.
+</Note>
+
+## Channels — producer/consumer pipelines
+
+`System.Threading.Channels.Channel<T>` is the right tool when you have
+**ongoing production and consumption** of items — a queue where one
+side produces and the other consumes, with optional backpressure.
+
+```csharp
+// A bounded channel: producer blocks when full (backpressure)
+var channel = Channel.CreateBounded<string>(capacity: 100);
+
+// Producer: reads files and pushes paths into the channel
+async Task ProduceAsync(string dir, CancellationToken ct)
+{
+    foreach (var path in Directory.EnumerateFiles(dir))
+    {
+        ct.ThrowIfCancellationRequested();
+        await channel.Writer.WriteAsync(path, ct);
+    }
+    channel.Writer.Complete();
+}
+
+// Consumer: reads paths from the channel and hashes each file
+async Task ConsumeAsync(CancellationToken ct)
+{
+    await foreach (var path in channel.Reader.ReadAllAsync(ct))
+    {
+        var hash = HashFile(path);
+        _results[path] = hash;
+    }
+}
+
+// Run both, wait for both to finish
+await Task.WhenAll(
+    ProduceAsync(_dir, _ct),
+    Task.Run(() => ConsumeAsync(_ct))
+);
+```
+
+<Figure src={featureImg} alt="Diagram of a channel pipeline: producer writes paths, consumer reads and hashes." caption="A bounded channel with one producer and one consumer. The bound (100) applies backpressure — if the consumer falls behind, the producer blocks on WriteAsync instead of unbounded memory growth." />
+
+### Why channels beat `BlockingCollection`
+
+`BlockingCollection<T>` was the pre-channel way to do this. It works,
+but it has three problems:
+
+1. **No async API.** `GetConsumingEnumerable()` blocks a thread. With
+   channels, `ReadAllAsync` is awaitable — no thread is blocked.
+2. **No built-in backpressure.** You can set a capacity, but the
+   producer still blocks a thread. With channels, `WriteAsync` is
+   awaitable — the producer yields.
+3. **No `IAsyncEnumerable` support.** Channels are designed for
+   `await foreach`, which composes with LINQ-to-async.
+
+If you're on .NET Core 2.1+, prefer channels. `BlockingCollection` is
+legacy.
+
+## Cancellation: the universal pattern
+
+Every async method should accept a `CancellationToken`. Every method
+that calls another async method should thread the token through. The
+token is your only way to cancel work that's in flight — there's no
+`Task.Abort()` (and that's a good thing; aborting threads mid-method
+leaves state inconsistent).
+
+```csharp
+// ✅ CancellationToken threaded through every layer
+public async Task<List<Order>> GetRecentOrdersAsync(int userId, CancellationToken ct)
+{
+    using var conn = new SqlConnection(_connStr);
+    await conn.OpenAsync(ct);
+    using var cmd = new SqlCommand("...", conn);
+    cmd.Parameters.AddWithValue("@userId", userId);
+    cmd.CommandTimeout = 30;
+    using var reader = await cmd.ExecuteReaderAsync(ct);
+    var orders = new List<Order>();
+    while (await reader.ReadAsync(ct))
+    {
+        ct.ThrowIfCancellationRequested();
+        orders.Add(MapOrder(reader));
+    }
+    return orders;
+}
+```
+
+<Note variant="warn">
+Don't ignore the token. If a method accepts `CancellationToken` but
+doesn't pass it to the operations it calls, you've lied to the caller.
+The token is a contract — if you accept it, you must use it.
+</Note>
+
+## A real example: parallel API calls with timeout
+
+Putting it all together — fetch from three APIs in parallel, with a
+5-second overall timeout, and gracefully handle partial failures:
+
+```csharp
+public async Task<EnrichedUser> EnrichUserAsync(int userId, CancellationToken ct)
+{
+    using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+    cts.CancelAfter(TimeSpan.FromSeconds(5));
+
+    try
+    {
+        var profileTask = _api.GetProfileAsync(userId, cts.Token);
+        var ordersTask = _api.GetOrdersAsync(userId, cts.Token);
+        var tagsTask = _api.GetTagsAsync(userId, cts.Token);
+
+        await Task.WhenAll(profileTask, ordersTask, tagsTask);
+
+        return new EnrichedUser
+        {
+            Profile = await profileTask,
+            Orders = await ordersTask,
+            Tags = await tagsTask,
+        };
+    }
+    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+    {
+        // Our timeout fired, not the caller's cancellation
+        _logger.LogWarning("EnrichUserAsync timed out for {UserId}", userId);
+        throw new TimeoutException($"Enriching user {userId} took > 5s");
+    }
+}
+```
+
+Three things to notice:
+
+1. **`CreateLinkedTokenSource`** — links the caller's token with our
+   timeout token. Either one cancels.
+2. **`when (!ct.IsCancellationRequested)`** — only catches the timeout,
+   not the caller's cancellation (which should propagate as-is).
+3. **`await profileTask` after `WhenAll`** — synchronous, the task is
+   already complete. This unwraps the result without re-throwing.
+
+## Closing
+
+The four concurrency models in C# are not interchangeable. Each one
+solves a different problem:
+
+- **`async`/`await`** for I/O-bound work — don't block threads.
+- **`Parallel.For`** for CPU-bound data-parallel work — partition and
+  conquer.
+- **`Task.WhenAll`** for fan-out / fan-in of heterogeneous tasks.
+- **`Channel<T>`** for producer/consumer pipelines with backpressure.
+
+Cancellation is universal — thread `CancellationToken` through every
+async method, no exceptions. If you don't, you can't cancel, and at 3am
+that means you can't recover from a runaway query without restarting
+the process.
+
+The right concurrency model makes the code simpler, not more complex.
+If your `async` code has a `Task.Run` wrapping an I/O call, or your
+`Parallel.For` body has an `await`, you've picked the wrong model.
+Step back, look at the work, and pick again.
