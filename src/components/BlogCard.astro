@@ -1,0 +1,167 @@
+---
+import { Image } from "astro:assets";
+import type { Post } from "../lib/blog";
+import { formatDate, readingTimeMinutes, tagSlug, wordCount } from "../lib/blog";
+
+interface Props {
+  post: Post;
+  index: number;
+}
+
+const { post, index } = Astro.props;
+const { title, description, pubDate, tags, thumbnail, thumbnailAlt } = post.data;
+const words = wordCount(post.body ?? "");
+const minutes = readingTimeMinutes(post.body ?? "");
+const monogram = title.trim().charAt(0).toUpperCase();
+---
+
+<article class={`blog-card ${index === 0 ? "blog-card--first" : ""}`}>
+  <div class="blog-card__layout">
+    <a class="blog-card__media" href={`/blog/${post.id}/`} aria-label={`Read ${title}`}>
+      {thumbnail ? (
+        <Image
+          src={thumbnail}
+          alt={thumbnailAlt ?? title}
+          widths={[320, 640, 960]}
+          sizes="(max-width: 639px) 100vw, 16rem"
+          loading={index < 2 ? "eager" : "lazy"}
+        />
+      ) : (
+        <span class="blog-card__monogram" aria-hidden="true">{monogram}</span>
+      )}
+    </a>
+
+    <div class="blog-card__content">
+      <p class="blog-card__meta">
+        <time datetime={pubDate.toISOString()}>{formatDate(pubDate)}</time>
+        <span aria-hidden="true">·</span>
+        <span>{words} words</span>
+        <span aria-hidden="true">·</span>
+        <span>{minutes} min read</span>
+      </p>
+      <h2 class="blog-card__title"><a href={`/blog/${post.id}/`}>{title}</a></h2>
+      <p class="blog-card__description">{description}</p>
+      {tags.length > 0 && (
+        <ul class="blog-card__tags" aria-label="Post tags">
+          {tags.map((tag) => (
+            <li><a href={`/blog/tags/${tagSlug(tag)}/`}>{tag}</a></li>
+          ))}
+        </ul>
+      )}
+    </div>
+  </div>
+</article>
+
+<style>
+  .blog-card {
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .blog-card--first { border-top: 0; }
+
+  .blog-card__layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.25rem;
+    padding: 1.5rem 0;
+  }
+
+  .blog-card__media {
+    display: grid;
+    min-width: 0;
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+  }
+
+  .blog-card__media :global(img) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform var(--transition);
+  }
+
+  .blog-card__media:hover :global(img),
+  .blog-card__media:focus-visible :global(img) { transform: scale(1.03); }
+
+  .blog-card__monogram {
+    display: grid;
+    place-items: center;
+    font-family: var(--font-display);
+    font-size: clamp(2.5rem, 8vw, 4rem);
+    font-weight: 650;
+    color: var(--ink-dim);
+    background: var(--surface-2);
+  }
+
+  .blog-card__content { min-width: 0; align-self: center; }
+
+  .blog-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.5;
+    color: var(--ink-dim);
+  }
+
+  .blog-card__title {
+    margin: 0.55rem 0 0;
+    font-family: var(--font-display);
+    font-size: clamp(1.45rem, 3vw, 2rem);
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    line-height: 1.08;
+  }
+
+  .blog-card__title a { color: var(--ink); text-decoration: none; }
+  .blog-card__title a:hover { color: var(--ink-soft); }
+
+  .blog-card__description {
+    max-width: 45rem;
+    margin: 0.6rem 0 0;
+    color: var(--ink-muted);
+    line-height: 1.65;
+  }
+
+  .blog-card__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .blog-card__tags a {
+    display: inline-flex;
+    padding: 0.18rem 0.55rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-full);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    color: var(--ink-muted);
+    text-decoration: none;
+    transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  }
+
+  .blog-card__tags a:hover,
+  .blog-card__tags a:focus-visible {
+    border-color: var(--ink-muted);
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+
+  @media (min-width: 640px) {
+    .blog-card__layout {
+      grid-template-columns: 16rem minmax(0, 1fr);
+      gap: 2rem;
+      padding: 1.75rem 0;
+    }
+  }
+</style>

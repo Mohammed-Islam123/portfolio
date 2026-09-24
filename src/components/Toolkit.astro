@@ -56,9 +56,8 @@ const pad = (n: number) => String(n).padStart(2, "0");
       </Reveal>
       <Reveal delay={140}>
         <p class="mt-3 max-w-xl font-sans text-[var(--ink-muted)]">
-          The tools I reach for, grouped by where I actually live. Hover a
-          cell to spotlight it — the rest step back. Cells with a dot carry
-          a note that opens right on hover.
+          The amber dot marks a tool with a note. Hover to read it, or click
+          to keep it open.
         </p>
       </Reveal>
 
@@ -84,7 +83,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
               <button
                 type="button"
                 data-filter={f.id}
-                class="relative z-10 shrink-0 rounded-[8px] px-3.5 py-1.5 font-mono text-[11px] tracking-[0.08em] transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+                class="relative z-10 shrink-0 rounded-[8px] px-3.5 py-1.5 font-mono text-xs tracking-[0.08em] transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
                 aria-pressed={i === 0 ? "true" : "false"}
               >
                 {f.label}
@@ -99,7 +98,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
         {
           toolGroups.map((group, groupIdx) => (
             <div data-group={group.id} class="transition-opacity [transition-duration:var(--transition)] opacity-100">
-              <p class="mb-3 inline-flex items-center gap-2 font-mono text-[11px] tracking-[0.16em] uppercase">
+              <p class="mb-3 inline-flex items-center gap-2 font-mono text-xs tracking-[0.16em] uppercase">
                 <span class="text-[var(--ink-muted)]">{group.label}</span>
                 <span class="h-px w-6 bg-[var(--ink-dim)]/40" aria-hidden="true" />
                 <span class="text-[var(--ink-dim)]">{group.tools.length}</span>
@@ -118,7 +117,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
                       >
                         {/* per-category incrementing ID — top-left, zero-padded.
                             The only number on the cell. */}
-                        <span class="font-sans text-[0.5rem] leading-none tabular-nums text-[var(--ink)]">
+                        <span class="font-sans text-[10px] leading-none tabular-nums text-[var(--ink)]">
                           {pad(idx + 1)}
                         </span>
                         {/* logo — center. The colored TechIcon is the ONE
@@ -127,7 +126,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
                           <TechIcon icon={tool.icon} brand={tool.brand} size={20} />
                         </span>
                         {/* name — bottom, sans lowercase */}
-                        <span class="w-full truncate text-center font-sans text-[0.55rem] leading-none lowercase text-[var(--ink-muted)]">
+                        <span class="w-full truncate text-center font-sans text-[11px] leading-none lowercase text-[var(--ink-muted)]">
                           {tool.name}
                         </span>
                         {/* has-note indicator — tiny amber dot, top-right.

@@ -14,14 +14,15 @@ import { values } from "../config/values";
 import Section from "./primitives/Section.astro";
 import SectionLabel from "./primitives/SectionLabel.astro";
 import Reveal from "./primitives/Reveal.astro";
+import UiIcon from "./icons/UiIcon.astro";
 
 const GLYPHS: Record<string, string> = {
-  "01": "⌘", // bytes over magic — command/key
-  "02": "↗", // learning out loud — upward/outward
-  "03": "⟐", // team before ego — linked
-  "04": "∵", // why before what — because
-  "05": "◎", // calm is a feature — centered/stable
-  "06": "⌥", // help is a skill — option/alternative
+  "01": "binary", // bytes over magic — read the bytes
+  "02": "pen-line", // learning out loud — write to figure it out
+  "03": "users", // team before ego — the commit the team owns
+  "04": "circle-help", // why before what — the "because ___" question
+  "05": "shield-check", // calm is a feature — logs, retries, idempotency
+  "06": "life-buoy", // help is a skill — make the next person self-sufficient
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -74,16 +75,16 @@ const pad = (n: number) => String(n).padStart(2, "0");
                   >
                     {/* glyph */}
                     <span
-                      class="v-glyph font-mono text-lg transition-colors [transition-duration:var(--transition)] text-[var(--ink-dim)]"
+                      class="v-glyph text-lg transition-colors [transition-duration:var(--transition)] text-[var(--ink-dim)]"
                       aria-hidden="true"
                     >
-                      {GLYPHS[v.index] ?? "·"}
+                      <UiIcon name={GLYPHS[v.index] ?? "circle-help"} size={18} />
                     </span>
                     <span class="font-mono text-xs tabular-nums text-[var(--ink-dim)]">
                       {v.index}
                     </span>
                     <span
-                      class="font-serif font-semibold tracking-[-0.025em] text-[var(--ink)]"
+                      class="font-display font-semibold tracking-[-0.025em] text-[var(--ink)]"
                       style="font-size: clamp(1.4rem, 3vw, 2.1rem);"
                     >
                       {v.title}
@@ -108,17 +109,17 @@ const pad = (n: number) => String(n).padStart(2, "0");
                 <span class="text-[var(--ink)] tabular-nums" data-card-index>01</span>
               </p>
               <div class="relative mt-4 flex items-center gap-3">
-                <span class="font-mono text-3xl text-[var(--ink)]" aria-hidden="true" data-card-glyph>
-                  {GLYPHS[values[0].index] ?? "·"}
+                <span class="text-3xl text-[var(--ink)]" aria-hidden="true" data-card-glyph>
+                  <UiIcon name={GLYPHS[values[0].index] ?? "circle-help"} size={24} />
                 </span>
-                <h3 class="font-serif text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)]" data-card-title>
+                <h3 class="font-display text-2xl font-semibold tracking-[-0.025em] text-[var(--ink)]" data-card-title>
                   {values[0].title}
                 </h3>
               </div>
               <p class="relative mt-4 font-sans text-[1.05rem] leading-[1.7] text-[var(--ink-muted)]" data-card-desc>
                 {values[0].description}
               </p>
-              <div class="relative mt-6 flex items-center justify-between border-t border-[var(--line-soft)] pt-3 font-mono text-[10px] tracking-[0.16em] text-[var(--ink-dim)] uppercase">
+              <div class="relative mt-6 flex items-center justify-between border-t border-[var(--line-soft)] pt-3 font-mono text-xs tracking-[0.16em] text-[var(--ink-dim)] uppercase">
                 <span>// principle</span>
                 <span class="tabular-nums" data-card-counter>01 / {pad(values.length)}</span>
               </div>
@@ -138,15 +139,15 @@ const pad = (n: number) => String(n).padStart(2, "0");
                 class="flex w-full items-baseline gap-3 py-5 text-left"
               >
                 <span
-                  class="font-mono text-lg transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-dim)]"
+                  class="text-lg transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-dim)]"
                   aria-hidden="true"
                 >
-                  {GLYPHS[v.index] ?? "·"}
+                  <UiIcon name={GLYPHS[v.index] ?? "circle-help"} size={18} />
                 </span>
                 <span class="font-mono text-xs text-[var(--ink-dim)] tabular-nums">
                   {v.index}
                 </span>
-                <span class="font-serif text-lg font-semibold tracking-[-0.02em] text-[var(--ink)]">
+                <span class="font-display text-lg font-semibold tracking-[-0.02em] text-[var(--ink)]">
                   {v.title}
                 </span>
                 {/* expand/collapse indicator */}
@@ -155,7 +156,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
                   style="transform: rotate(0deg);"
                   aria-hidden="true"
                 >
-                  ›
+                  <UiIcon name="chevron-right" size={12} />
                 </span>
               </button>
               <div
@@ -177,15 +178,19 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 <script>
   import { playSound } from "../scripts/sound-init";
+  import { UI_ICONS } from "../lib/icons";
 
   const GLYPHS: Record<string, string> = {
-    "01": "⌘",
-    "02": "↗",
-    "03": "⟐",
-    "04": "∵",
-    "05": "◎",
-    "06": "⌥",
+    "01": "binary",
+    "02": "pen-line",
+    "03": "users",
+    "04": "circle-help",
+    "05": "shield-check",
+    "06": "life-buoy",
   };
+
+  const svg = (name: string, size: number) =>
+    `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UI_ICONS[name] ?? ""}</svg>`;
 
   class ValuesListEl extends HTMLElement {
     private cleanupFns: (() => void)[] = [];
@@ -218,7 +223,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
         const v = values[active];
         if (!v || !cardBody) return;
         cardIndex!.textContent = v.index;
-        cardGlyph!.textContent = GLYPHS[v.index] ?? "·";
+        cardGlyph!.innerHTML = svg(GLYPHS[v.index] ?? "circle-help", 24);
         cardTitle!.textContent = v.title;
         cardDesc!.textContent = v.description;
         cardCounter!.textContent = `${pad(active + 1)} / ${pad(count)}`;

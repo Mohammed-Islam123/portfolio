@@ -28,38 +28,25 @@ import Reveal from "./primitives/Reveal.astro";
             class="font-sans font-normal leading-[1.7] tracking-[-0.01em] text-[var(--ink)]"
             style="font-size: clamp(1.2rem, 2.2vw, 1.55rem);"
           >
-            <span class="font-normal text-[var(--ink)]">Mohamed Islam Benyahkem</span>
-            — backend engineer in Algiers. I like the parts of software that
-            don't get screenshots: protocols, data paths, and the bits that
-            decide whether a request comes back in
-            <span class="font-mono tabular-nums text-[var(--ink-muted)]">40ms</span>
-            or
-            <span class="font-mono tabular-nums text-[var(--ink-muted)]">400ms</span>.
+              I’m a backend-focused software engineer.
+              I build APIs and services primarily with C# and .NET,
+              and use other languages and technologies when a project needs them.
+              I’m particularly interested in system design, databases, and real-time communication.
+              Outside of software development work, I enjoy working on IoT and robotics projects.
+
           </p>
         </div>
       </Reveal>
 
-      <!-- ── portrait (rounded, grayscale → color on hover) ────────
-           Smaller across all breakpoints. Keeps the bio as the focal
-           point, portrait as an accent. Placeholder portrait — swap the
-           src with a real photo to replace. -->
+      <!-- ── portrait (unframed, grayscale → color on hover) ───────
+           Kept smaller than the bio, but now sits directly on the page. -->
       <Reveal delay={120}>
         <figure class="group relative mx-auto w-full max-w-[11rem] sm:max-w-[13rem] md:max-w-[16rem]">
-          <div
-            class="relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] aspect-[4/5]"
-          >
-            <img
-              src="https://i.pravatar.cc/600?img=68"
-              alt="Mohamed Islam Benyahkem — portrait placeholder"
-              loading="lazy"
-              class="h-full w-full object-cover bw-img" />
-            <div
-              aria-hidden="true"
-              class="pointer-events-none absolute inset-0"
-              style="background: linear-gradient(to bottom, transparent 55%, rgba(var(--scrim-color), 0.5) 100%);"
-            >
-            </div>
-          </div>
+          <img
+            src="/portrait-about.png"
+            alt="Mohamed Islam Benyahkem at a technology event"
+            loading="lazy"
+            class="block h-auto w-full bw-img" />
         </figure>
       </Reveal>
     </div>

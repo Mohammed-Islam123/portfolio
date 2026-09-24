@@ -50,7 +50,7 @@ import ScrambleName from "./ScrambleName.astro";
        on load with a short independent animation. -->
   <div
     aria-hidden="true"
-    class="pointer-events-none fixed left-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2 rounded-full border border-[var(--glass-border)] px-3.5 font-mono text-xs text-[var(--ink-dim)] backdrop-blur-md lg:flex"
+    class="nav-haze pointer-events-none fixed left-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2 rounded-full border border-[var(--glass-border)] px-3.5 font-mono text-xs text-[var(--ink-dim)] lg:flex"
     style="animation: hero-fade 500ms var(--ease) both;"
   >
     <span class="hero-clock tabular-nums">--:--:--</span>
@@ -67,7 +67,7 @@ import ScrambleName from "./ScrambleName.astro";
        horizontal line. lg+ only (matches the clock). -->
   <div
     aria-hidden="true"
-    class="hero-gated pointer-events-none fixed right-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2.5 rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3.5 font-mono text-[11px] text-[var(--ink-muted)] backdrop-blur-md lg:flex hf-500-200"
+    class="hero-gated pointer-events-none fixed right-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2.5 rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3.5 font-mono text-xs text-[var(--ink-muted)] backdrop-blur-md lg:flex hf-500-200"
     style="box-shadow: var(--glass-inset);"
   >
     <span class="relative flex h-2 w-2">
@@ -85,58 +85,37 @@ import ScrambleName from "./ScrambleName.astro";
     <span class="text-[var(--ink)]">{siteConfig.status.label}</span>
   </div>
 
-  <!-- portrait + text stack, centered -->
-  <div class="relative z-10 flex flex-col items-center">
-    <!-- ── portrait (placeholder) ──────────────────────────────── -->
-    <div
-      class="hero-gated relative hf-800-0"
-      style="margin-bottom: -2.75rem;"
-    >
-      <!-- soft monochrome glow orb behind portrait -->
+  <!-- ── portrait + copy ─────────────────────────────────────────
+       The portrait is deliberately an unframed page element, rather than
+       a card. Its lower mask dissolves through the copy so the two layers
+       feel like one hero composition. -->
+  <div class="relative z-10 grid w-full min-h-[calc(100svh-var(--nav-h))] place-items-center">
+    <div class="hero-gated group relative [grid-area:1/1] hf-800-0">
+      <!-- soft monochrome glow behind the unframed portrait -->
       <div
         aria-hidden="true"
-        class="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-[160%] w-[140%]"
+        class="pointer-events-none absolute left-1/2 top-[38%] h-[84%] w-[148%] -translate-x-1/2 -translate-y-1/2"
         style="background: radial-gradient(ellipse 45% 40% at 50% 50%, rgba(255,255,255,0.06) 0%, transparent 65%);"
       >
       </div>
 
-      <!-- PortraitPlaceholder — a clean stand-in for the real portrait.
-           Bottom fade mask dissolves into the text below. Replace the
-           inner <img> src with a real photo (e.g. /portrait.jpg in
-           /public); the fade mask + sizing stay the same. -->
-      <div
-        class="relative h-[clamp(17rem,40vh,24rem)] w-[clamp(13rem,28vw,19rem)]"
-        style="-webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);"
-        aria-label="portrait — placeholder"
-      >
-        <!-- grayscale by default, blooms to color on hover (.bw-img) -->
-        <div
-          class="group relative h-full w-full overflow-hidden rounded-t-[var(--radius-lg)] border border-[var(--glass-border)] bg-[var(--surface)]"
-        >
-          <img
-            src="https://i.pravatar.cc/600?img=68"
-            alt="portrait placeholder — replace with your photo"
-            loading="eager"
-            class="h-full w-full object-cover bw-img" />
-          <!-- subtle scrim so the fade-into-text reads on any photo.
-               Uses --scrim-color so it adapts to the active theme. -->
-          <div
-            aria-hidden="true"
-            class="pointer-events-none absolute inset-0"
-            style="background: linear-gradient(to bottom, transparent 40%, rgba(var(--scrim-color), 0.55) 100%);"
-          >
-          </div>
-        </div>
-      </div>
+      <!-- The image is intentionally large and borderless. The bottom
+           mask begins behind the text and dissolves into the page colour. -->
+      <img
+        src="/portrait-hero.png"
+        alt="Mohamed Islam Benyahkem"
+        loading="eager"
+        class="hero-portrait relative block h-[clamp(42rem,104svh,70rem)] w-auto max-w-[94vw] -translate-y-[clamp(0.75rem,3vh,2.5rem)] object-contain bw-img" />
     </div>
 
-    <!-- ── greeting text ───────────────────────────────────────── -->
-    <!-- block is centered as a unit. ONLY "I am" left-aligns to the
-         name's left edge (editorial kicker). greeting / role / buttons
-         stay centered. -->
-    <div class="relative z-10 flex flex-col items-center px-6 text-center">
+    <!-- The copy overlays the portrait's lower fade instead of sitting
+         below it. "I am" remains aligned to the name's left edge. -->
+    <div class="hero-copy relative isolate z-10 flex [grid-area:1/1] self-end flex-col items-center px-6 pb-[clamp(5.5rem,11vh,8rem)] text-center">
+      <!-- A local wash improves text contrast without becoming a visible
+           panel or dimming the portrait's face. -->
+      <div aria-hidden="true" class="hero-copy__wash pointer-events-none absolute -inset-x-12 -bottom-8 -top-20 -z-10"></div>
       <p
-        class="hero-gated font-mono text-[clamp(1.6rem,4.4vw,2.4rem)] tracking-[0.16em] text-[var(--ink-muted)] uppercase hf-700-100"
+        class="hero-gated font-mono text-[clamp(1.6rem,4.4vw,2.4rem)] tracking-[0.16em] text-[var(--ink)] uppercase hf-700-100"
       >
         <Greeting />
       </p>
@@ -167,7 +146,7 @@ import ScrambleName from "./ScrambleName.astro";
       </h1>
       <!-- role keywords — static line -->
       <p
-        class="hero-gated mt-5 max-w-[42rem] font-mono text-[clamp(0.8rem,1.6vw,0.95rem)] tracking-[0.08em] text-[var(--ink-muted)] hf-800-400"
+        class="hero-gated mt-5 max-w-[42rem] font-mono text-[clamp(0.8rem,1.6vw,0.95rem)] tracking-[0.08em] text-[var(--ink-soft)] hf-800-400"
       >
         {siteConfig.roleKeywords}
       </p>
@@ -231,7 +210,7 @@ import ScrambleName from "./ScrambleName.astro";
 
   <!-- scroll cue -->
   <div
-    class="hero-gated absolute bottom-10 left-1/2 -translate-x-1/2 font-mono text-[10px] tracking-[0.32em] text-[var(--ink-dim)] uppercase hf-800-800"
+    class="hero-gated absolute bottom-10 left-1/2 -translate-x-1/2 font-mono text-xs tracking-[0.32em] text-[var(--ink-dim)] uppercase hf-800-800"
   >
     <span class="inline-flex flex-col items-center gap-2.5">
       <span class="flex items-center gap-2">
@@ -280,12 +259,16 @@ import ScrambleName from "./ScrambleName.astro";
     private cleanupFns: (() => void)[] = [];
 
     connectedCallback() {
-      // ── loader gate — reveal gated elements on loader:dismiss ────
-      // safety timeout (2.5s) mirrors the old useLoaderDismissed hook
-      // so the hero is never permanently hidden.
+      // The state check covers a loader that dismissed before this
+      // component connected during a document or ClientRouter lifecycle.
       const reveal = () => this.classList.add("revealed");
-      window.addEventListener("loader:dismiss", reveal, { once: true });
-      const safety = setTimeout(reveal, 2500);
+      const loaderDismissed = document.documentElement.dataset.loaderState === "dismissed";
+      if (loaderDismissed) {
+        this.classList.add("is-client-navigation");
+      }
+      if (loaderDismissed) reveal();
+      else window.addEventListener("loader:dismiss", reveal, { once: true });
+      const safety = setTimeout(reveal, 6000);
       this.cleanupFns.push(() => {
         window.removeEventListener("loader:dismiss", reveal);
         clearTimeout(safety);
@@ -328,6 +311,26 @@ import ScrambleName from "./ScrambleName.astro";
 </script>
 
 <style>
+  /* The portrait keeps its natural cut-out silhouette. This mask only
+     softens its lower edge, letting the overlaid copy emerge from the
+     image and then resolve into the page background. */
+  .hero-portrait {
+    -webkit-mask-image: linear-gradient(to bottom, #000 42%, #000 50%, transparent 94%);
+    mask-image: linear-gradient(to bottom, #000 42%, #000 50%, transparent 94%);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+  }
+
+  .hero-copy__wash {
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(var(--scrim-color), 0.48) 24%,
+      rgba(var(--scrim-color), 0.90) 64%,
+      var(--bg) 100%
+    );
+  }
+
   @keyframes hero-fade {
     from {
       opacity: 0;
@@ -391,5 +394,10 @@ import ScrambleName from "./ScrambleName.astro";
   }
   .hero-root.revealed .hf-800-800 {
     animation: hero-fade 800ms var(--ease) 800ms both;
+  }
+  .hero-root.is-client-navigation .hero-gated {
+    opacity: 1;
+    transform: none;
+    animation: none;
   }
 </style>

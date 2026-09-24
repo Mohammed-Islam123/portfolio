@@ -1,36 +1,22 @@
 ---
-/**
- * Root layout — html shell, meta, fonts, global chrome.
- *
- * Typography — theoptimisticdesigner.com-inspired.
- *
- *  Sans  : Geist — Vercel's humanist-geometric sans. A close peer of
- *          the reference site's Switzer (modern, technical, warm, highly
- *          legible). Used for ALL text: hero name, section titles, body,
- *          UI. Single-typeface discipline — the reference uses one sans
- *          for everything, no serif.
- *  Mono  : Geist Mono — used ONLY for tiny eyebrow labels, timestamps,
- *          terminal facts, nav, footer. The reference site uses Geist
- *          Mono for exactly these micro-labels (with ~0.08em positive
- *          tracking).
- *
- * The reference is PURELY monochrome (warm grays on #0B0B0B, no accent
- * color). The amber signal accent is retained ONLY for the semantic
- * "open to work" status dot and focus rings — everything else goes
- * monochrome to match the reference.
- */
 import { ClientRouter } from "astro:transitions";
-import { siteConfig } from "../config/site";
+import Loader from "../components/Loader.astro";
+import RouteLoader from "../components/RouteLoader.astro";
 import "../styles/global.css";
 
 interface Props {
   title?: string;
   description?: string;
+  loading?: {
+    mode: "home" | "article" | "generic";
+    slug?: string;
+  } | false;
 }
 
 const {
   title = "Mohamed Islam — Backend Engineer",
-  description = "Mohamed Islam Benyahkem — backend engineer in Algiers. Protocols, data paths, and the bits that decide 40ms vs 400ms.",
+  description = "I’m a backend-focused software engineer. I build APIs and services primarily with C# and .NET, and use other languages and technologies when a project needs them. I’m particularly interested in system design, databases, and real-time communication. Outside of software development work work, I enjoy working on IoT and robotics projects.",
+  loading = Astro.url.pathname === "/" ? { mode: "home" } : false,
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site);
@@ -50,6 +36,12 @@ const ogImage = new URL("/og.png", Astro.site);
     <meta name="author" content="Mohamed Islam Benyahkem" />
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title="Mohamed Islam — blog"
+      href={new URL("rss.xml", Astro.site)}
+    />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
@@ -91,13 +83,17 @@ const ogImage = new URL("/og.png", Astro.site);
     </script>
   </head>
   <body class="antialiased">
-    <slot />
-    <!-- global chrome (init-once singletons; see scripts for lifecycle) -->
+    {loading && <Loader mode={loading.mode} slug={loading.slug} />}
+    <RouteLoader />
+    <div data-page-transition-root>
+      <slot />
+    </div>
     <script>
       import "../scripts/smooth-scroll";
       import "../scripts/custom-cursor";
       import "../scripts/reveal";
       import "../scripts/sound-init";
+      import "../scripts/route-transition";
     </script>
   </body>
 </html>

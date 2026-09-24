@@ -1,0 +1,121 @@
+---
+import UiIcon from "./icons/UiIcon.astro";
+---
+
+<article-tools>
+  <button class="article-back-to-top" type="button" data-back-to-top aria-label="Back to top" hidden>
+    <UiIcon name="arrow-up" size={18} />
+    <span class="sr-only">Back to top</span>
+  </button>
+
+  <template data-copy-idle>
+    <span aria-hidden="true"><UiIcon name="copy" size={14} /></span>
+    <span class="sr-only">Copy code</span>
+  </template>
+  <template data-copy-success>
+    <span aria-hidden="true"><UiIcon name="shield-check" size={14} /></span>
+    <span class="sr-only">Code copied</span>
+  </template>
+</article-tools>
+
+<script>
+  class ArticleTools extends HTMLElement {
+    private abort?: AbortController;
+    private frame = 0;
+    private resetTimers = new Map<HTMLButtonElement, number>();
+
+    connectedCallback() {
+      this.abort?.abort();
+      this.abort = new AbortController();
+      this.installCodeCopy(this.abort.signal);
+
+      const backToTop = this.querySelector<HTMLButtonElement>("[data-back-to-top]");
+      if (!backToTop) return;
+
+      const updateBackToTop = () => {
+        this.frame = 0;
+        backToTop.hidden = window.scrollY < 640;
+      };
+      const onScroll = () => {
+        if (!this.frame) this.frame = requestAnimationFrame(updateBackToTop);
+      };
+
+      window.addEventListener("scroll", onScroll, { passive: true, signal: this.abort.signal });
+      backToTop.addEventListener(
+        "click",
+        () => {
+          const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+        },
+        { signal: this.abort.signal },
+      );
+      updateBackToTop();
+    }
+
+    disconnectedCallback() {
+      this.abort?.abort();
+      this.abort = undefined;
+      cancelAnimationFrame(this.frame);
+      this.frame = 0;
+      this.resetTimers.forEach((timer) => window.clearTimeout(timer));
+      this.resetTimers.clear();
+    }
+
+    private installCodeCopy(signal: AbortSignal) {
+      document.querySelectorAll<HTMLElement>(".article-body pre.astro-code").forEach((pre) => {
+        let wrapper = pre.closest<HTMLElement>(".article-code-block");
+        if (!wrapper) {
+          wrapper = document.createElement("div");
+          wrapper.className = "article-code-block";
+          pre.before(wrapper);
+          wrapper.append(pre);
+        }
+
+        let button = wrapper.querySelector<HTMLButtonElement>("[data-copy-code]");
+        if (!button) {
+          button = document.createElement("button");
+          button.type = "button";
+          button.className = "article-code-copy";
+          button.dataset.copyCode = "";
+          button.setAttribute("aria-label", "Copy code");
+          wrapper.append(button);
+        }
+        this.renderCopyState(button, "idle");
+        button.addEventListener("click", () => void this.copyCode(pre, button!), { signal });
+      });
+    }
+
+    private async copyCode(pre: HTMLElement, button: HTMLButtonElement) {
+      const code = pre.querySelector("code")?.textContent ?? "";
+      if (!code) return;
+
+      try {
+        await navigator.clipboard.writeText(code);
+        this.renderCopyState(button, "success");
+        button.dataset.state = "copied";
+      } catch {
+        button.dataset.state = "failed";
+        button.setAttribute("aria-label", "Copy code unavailable");
+      }
+
+      window.clearTimeout(this.resetTimers.get(button));
+      this.resetTimers.set(
+        button,
+        window.setTimeout(() => {
+          delete button.dataset.state;
+          this.renderCopyState(button, "idle");
+          this.resetTimers.delete(button);
+        }, 1800),
+      );
+    }
+
+    private renderCopyState(button: HTMLButtonElement, state: "idle" | "success") {
+      const template = this.querySelector<HTMLTemplateElement>(`[data-copy-${state}]`);
+      if (!template) return;
+      button.replaceChildren(template.content.cloneNode(true));
+      button.setAttribute("aria-label", state === "success" ? "Code copied" : "Copy code");
+    }
+  }
+
+  if (!customElements.get("article-tools")) customElements.define("article-tools", ArticleTools);
+</script>

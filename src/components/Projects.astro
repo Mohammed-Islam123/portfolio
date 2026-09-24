@@ -29,15 +29,15 @@
  *  computed from each card's offset to the active index (initial
  *  transforms for active=0 are even rendered at build time).
  *
- *  The "view all" modal replaces the old Radix Dialog with a
- *  hand-rolled dialog (~50 lines): Escape / backdrop click to close,
- *  aria-modal, focus management.
+ *  A list view offers the same projects as expandable rows. The carousel
+ *  rotates every three seconds while visible and idle.
  */
-import { projects } from "../config/projects";
+import { projects, type Project } from "../config/projects";
 import Section from "./primitives/Section.astro";
 import SectionLabel from "./primitives/SectionLabel.astro";
 import Reveal from "./primitives/Reveal.astro";
 import TechIcon from "./icons/TechIcon.astro";
+import UiIcon from "./icons/UiIcon.astro";
 
 /**
  * coverflowTransform — compute the 3D transform for a card given its
@@ -103,6 +103,9 @@ const cardTransition =
 
 const count = projects.length;
 const pad = (n: number) => String(n).padStart(2, "0");
+const isExternalLink = (href: string) => /^https?:\/\//.test(href);
+const linkIcon = (kind: Project["links"][number]["kind"]) =>
+  kind === "case" ? "chevron-right" : "arrow-up-right";
 ---
 
 <project-carousel data-count={count} data-slugs={projects.map((p) => p.slug).join(",")}>
@@ -114,53 +117,18 @@ const pad = (n: number) => String(n).padStart(2, "0");
       <Reveal delay={80}>
         <h2 class="sec-title mt-3 max-w-2xl">Things I've built.</h2>
       </Reveal>
-      <Reveal delay={140}>
-        <p class="mt-3 max-w-xl font-sans text-[var(--ink-muted)]">
-          A selection of backend work — protocols, data paths, and the
-          infrastructure that keeps them honest. Drag, swipe, or use the
-          arrows to move through the stack.
-        </p>
-      </Reveal>
-
-      <!-- ── carousel controls ─────────────────────────────────── -->
-      <div class="mt-8 flex items-center justify-between gap-3">
-        <div class="flex items-center gap-1.5">
-          {
-            projects.map((_, i) => (
-              <button
-                type="button"
-                data-dot={i}
-                aria-label={`go to project ${i + 1}`}
-                class="h-1.5 rounded-full transition-all [transition-duration:var(--transition-fast)]"
-                style={`width: ${i === 0 ? 24 : 8}px; background: ${i === 0 ? "var(--ink)" : "var(--line)"};`}
-              />
-            ))
-          }
-        </div>
+      <div class="mt-8 flex items-center justify-end gap-3">
         <div class="flex items-center gap-2">
           <button
             type="button"
-            data-open-all
-            aria-label="view all projects"
-            class="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 font-mono text-[11px] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)]"
+            data-view-toggle
+            aria-controls="project-list"
+            aria-pressed="false"
+            class="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 font-mono text-xs text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)]"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="3" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="14" y="3" width="7" height="7" rx="1"></rect>
-              <rect x="3" y="14" width="7" height="7" rx="1"></rect>
-              <rect x="14" y="14" width="7" height="7" rx="1"></rect>
-            </svg>
-            <span>view all</span>
+            <span data-view-icon="list"><UiIcon name="list" size={14} /></span>
+            <span data-view-icon="carousel" hidden><UiIcon name="layout-grid" size={14} /></span>
+            <span data-view-label>list view</span>
           </button>
           <!-- prev arrow -->
           <button
@@ -218,17 +186,18 @@ const pad = (n: number) => String(n).padStart(2, "0");
            absent. They were only needed when the stage hijacked the
            wheel. `touch-pan-y` keeps vertical page scroll native while
            still letting us capture horizontal swipes for the drag
-           gesture. `overflow-hidden` clips the side cards that fan out
-           beyond the stage edges so they never trigger horizontal page
-           scroll on narrow viewports. -->
+           gesture. The page-level horizontal clip keeps the fanned-out
+           side cards from creating horizontal scroll; the stage itself
+           remains visible so the active card's glow is not cropped. -->
+      <div data-carousel-view class="project-view project-view--carousel">
       <div
         tabindex="0"
         role="region"
         aria-label="projects carousel"
         aria-roledescription="carousel"
-        aria-live="polite"
-        data-cursor="scroll"
-        class="coverflow-stage relative mt-8 h-[520px] w-full cursor-grab select-none overflow-hidden touch-pan-y outline-none active:cursor-grabbing sm:h-[500px]"
+        aria-live="off"
+        data-cursor="swipe"
+        class="coverflow-stage relative mt-8 w-full cursor-grab select-none touch-pan-y outline-none active:cursor-grabbing"
       >
         {
           projects.map((p, i) => {
@@ -241,12 +210,12 @@ const pad = (n: number) => String(n).padStart(2, "0");
                 data-active={isActive ? "" : undefined}
                 aria-hidden={!isActive ? "true" : undefined}
                 aria-label={`${p.title} — ${p.year}`}
-                class="coverflow-card group absolute left-1/2 top-0 flex w-[86vw] max-w-[380px] -translate-x-1/2 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] [transform-style:preserve-3d] [backface-visibility:hidden] will-change-transform"
+                class="coverflow-card group absolute left-1/2 top-4 flex w-[86vw] max-w-[420px] -translate-x-1/2 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] [transform-style:preserve-3d] [backface-visibility:hidden] will-change-transform"
                 style={`transform: ${t.transform}; opacity: ${t.opacity}; z-index: ${t.zIndex}; pointer-events: ${t.pointerEvents}; filter: ${t.filter}; --card-accent: ${p.accent}; transition: ${cardTransition}; cursor: ${isActive ? "default" : "pointer"};`}
               >
                 <!-- cover — ONLY the background is kept (accent gradient +
                      ghosted primary-tech logo). -->
-                <div class="relative h-48 overflow-hidden">
+                <div class="relative h-50 overflow-hidden">
                   <!-- accent-tinted background — the card's colour identity -->
                   <div
                     aria-hidden="true"
@@ -282,67 +251,70 @@ const pad = (n: number) => String(n).padStart(2, "0");
                     style="background: linear-gradient(155deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.06) 45%, transparent 100%); box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.10);"
                   />
                   <!-- year chip — small, bottom-right of the cover -->
-                  <div class="absolute right-4 bottom-3 font-mono text-[11px] tabular-nums text-[var(--ink-dim)]">
+                  <div class="absolute right-4 bottom-3 font-mono text-xs tabular-nums text-[var(--ink-dim)]">
                     {p.year}
                   </div>
                   <!-- bottom-left: title on the cover -->
                   <div class="absolute bottom-3 left-4 right-16">
-                    <div class="font-serif text-2xl font-bold tracking-[-0.03em] text-[var(--ink)] transition-colors [transition-duration:var(--transition)] group-hover:text-[var(--ink-soft)]">
+                    <div class="font-display text-2xl font-bold tracking-[-0.03em] text-[var(--ink)] transition-colors [transition-duration:var(--transition)] group-hover:text-[var(--ink-soft)]">
                       {p.title}
                     </div>
                   </div>
                 </div>
 
                 <!-- body — description + tech + actions -->
-                <div class="flex flex-1 flex-col p-5">
-                  <p class="mt-1 flex-1 font-sans text-[0.92rem] leading-[1.7] text-[var(--ink-muted)]">
-                    {p.description}
-                  </p>
+                <div class="flex flex-1 flex-col p-6">
+                  <div id={`project-card-description-${i}`} data-description-viewport class="project-description-viewport">
+                    <p data-description class="font-sans text-[0.92rem] leading-[1.7] text-[var(--ink-muted)]">
+                      {p.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    data-description-toggle
+                    aria-controls={`project-card-description-${i}`}
+                    aria-expanded="false"
+                    class="project-description-toggle mt-1 inline-flex min-h-11 items-center self-start font-mono text-xs text-[var(--ink-soft)] underline underline-offset-4 transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
+                    hidden
+                  >Read more</button>
 
                   <!-- tech -->
                   <div class="mt-4 flex flex-wrap gap-1.5 pb-2">
                     {p.tech.map((tech) => (
-                      <span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] text-[var(--ink-muted)]">
+                      <span class="project-tech-chip inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-[var(--surface-2)] px-2.5 py-1 font-mono text-xs text-[var(--ink-muted)]">
                         <TechIcon icon={tech.icon} brand={tech.brand || "var(--ink-dim)"} size={12} />
                         {tech.label}
                       </span>
                     ))}
                   </div>
 
-                  <!-- actions — only the focused card exposes these (the
-                       JS toggles .actions-on; side cards sit at 40%) -->
-                  <div
-                    class={`card-actions mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--line-soft)] pt-4 font-mono text-xs transition-opacity [transition-duration:var(--transition)] ${isActive ? "opacity-100" : "opacity-40"}`}
-                  >
-                    <a
-                      href={`/projects/${p.slug}`}
-                      data-cursor="default"
-                      class="group/act inline-flex items-center gap-1 text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="text-[var(--ink-dim)] transition-colors transition-transform [transition-duration:var(--transition-fast)] group-hover/act:text-[var(--ink)] group-hover/act:translate-x-0.5"
+                  <!-- actions — only the focused card exposes these; side
+                       cards keep the same actions at reduced opacity. -->
+                  {
+                    p.links.length > 0 && (
+                      <div
+                        class={`card-actions mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--line-soft)] pt-4 font-mono text-xs transition-opacity [transition-duration:var(--transition)] ${isActive ? "opacity-100" : "opacity-40"}`}
                       >
-                        ›
-                      </span>
-                      <span class="underline-grow">case</span>
-                    </a>
-                    {p.links.map((l) => (
+                        {p.links.map((l) => (
                       <a
                         href={l.href}
-                        data-cursor="default"
+                        target={isExternalLink(l.href) ? "_blank" : undefined}
+                        rel={isExternalLink(l.href) ? "noreferrer" : undefined}
+                        tabindex={isActive ? undefined : -1}
                         class="group/act inline-flex items-center gap-1 text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
                       >
                         <span
                           aria-hidden="true"
                           class="text-[var(--ink-dim)] transition-colors transition-transform [transition-duration:var(--transition-fast)] group-hover/act:text-[var(--ink)] group-hover/act:translate-x-0.5"
                         >
-                          ↗
+                          <UiIcon name={linkIcon(l.kind)} size={12} />
                         </span>
                         <span class="underline-grow">{l.label}</span>
                       </a>
-                    ))}
-                  </div>
+                        ))}
+                      </div>
+                    )
+                  }
                 </div>
               </article>
             );
@@ -351,95 +323,92 @@ const pad = (n: number) => String(n).padStart(2, "0");
       </div>
 
       <!-- counter + active slug (helps orient on long lists) -->
-      <div class="mt-4 flex items-center justify-center gap-3 font-mono text-[11px] text-[var(--ink-dim)]">
+      <div class="mt-4 flex items-center justify-center gap-3 font-mono text-xs text-[var(--ink-dim)]">
         <span class="tabular-nums" data-counter-index>01</span>
         <span aria-hidden="true">/</span>
         <span class="tabular-nums">{pad(count)}</span>
         <span aria-hidden="true" class="text-[var(--ink-faint)]">·</span>
         <span class="text-[var(--ink-muted)]" data-counter-slug>{projects[0].slug}</span>
       </div>
+      </div>
+
+      <div id="project-list" data-list-view class="project-view project-view--list relative mt-8" hidden>
+        <div
+          data-list-scroll
+          tabindex="0"
+          role="region"
+          aria-label="project list"
+          class="max-h-[31rem] overflow-y-auto px-4 py-4 [scrollbar-width:thin] [scrollbar-color:var(--line)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--line)] [&::-webkit-scrollbar-track]:bg-transparent md:max-h-[38.25rem]"
+        >
+          <div class="grid gap-3">
+            {
+              projects.map((p, i) => (
+                <article
+                  data-list-card
+                  class="group/list-card relative overflow-hidden rounded-[var(--radius)] border border-[var(--line)] bg-[var(--surface)] p-5 transition-[border-color,background-color,transform] [transition-duration:var(--transition-fast)] hover:-translate-y-px hover:border-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
+                  style={`--project-accent: ${p.accent};`}
+                >
+                  <span aria-hidden="true" class="absolute inset-y-0 left-0 w-px bg-[var(--project-accent)] opacity-70" />
+                  <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span class="font-mono text-xs tabular-nums text-[var(--ink-dim)]">{pad(i + 1)}</span>
+                    <h3 class="font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">{p.title}</h3>
+                    <span class="ml-auto font-mono text-xs tabular-nums text-[var(--ink-dim)]">{p.year}</span>
+                    <span class="basis-full font-mono text-[0.68rem] tracking-[0.08em] text-[var(--ink-dim)] uppercase">{p.category}</span>
+                  </div>
+                  <div id={`project-row-description-${i}`} data-description-viewport class="project-description-viewport mt-2">
+                    <p data-description class="max-w-4xl font-sans text-sm leading-[1.55] text-[var(--ink-muted)]">{p.description}</p>
+                  </div>
+                  <button
+                    type="button"
+                    data-description-toggle
+                    aria-controls={`project-row-description-${i}`}
+                    aria-expanded="false"
+                    class="project-description-toggle mt-1 inline-flex min-h-11 items-center font-mono text-xs text-[var(--ink-soft)] underline underline-offset-4 transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
+                    hidden
+                  >Read more</button>
+                  <div class="mt-4 border-t border-[var(--line-soft)] pt-3 font-mono text-xs">
+                    <div class="flex flex-wrap gap-1.5">
+                      {p.tech.map((tech) => (
+                        <span class="project-tech-chip inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-[var(--surface-2)] px-2.5 py-1 font-mono text-xs text-[var(--ink-muted)]">
+                          <TechIcon icon={tech.icon} brand={tech.brand || "var(--ink-dim)"} size={12} />
+                          {tech.label}
+                        </span>
+                      ))}
+                    </div>
+                    {
+                      p.links.length > 0 && (
+                        <div class="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+                          {p.links.map((l) => (
+                            <a
+                              href={l.href}
+                              target={isExternalLink(l.href) ? "_blank" : undefined}
+                              rel={isExternalLink(l.href) ? "noreferrer" : undefined}
+                              class="group/act inline-flex items-center gap-1 text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
+                            >
+                              <span aria-hidden="true" class="text-[var(--ink-dim)] transition-transform [transition-duration:var(--transition-fast)] group-hover/act:translate-x-0.5">
+                                <UiIcon name={linkIcon(l.kind)} size={11} />
+                              </span>
+                              <span class="underline-grow">{l.label}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )
+                    }
+                  </div>
+                </article>
+              ))
+            }
+          </div>
+        </div>
+        <div
+          aria-hidden="true"
+          data-list-fade
+          class="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-b from-transparent to-[var(--bg-soft)] transition-opacity [transition-duration:var(--transition-fast)]"
+        />
+      </div>
     </div>
   </Section>
 
-  <!-- ── "view all" modal — full list of every project ──────────────
-       Opens from the "view all" button in the controls row. Each row is
-       a link to that project's detail page (/projects/[slug]). The list
-       scrolls internally (max-h) so it stays usable even once the real
-       project array grows long. Hand-rolled replacement for the old
-       Radix Dialog: Escape / backdrop click closes, aria-modal, focus
-       moves into the panel and restores to the opener on close. -->
-  <div class="pm-root" hidden>
-    <div class="pm-overlay fixed inset-0 z-50 bg-black/80" data-close-all></div>
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="all projects"
-      class="pm-panel fixed left-1/2 top-1/2 z-50 flex max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] p-0 shadow-lg sm:max-w-2xl"
-      tabindex="-1"
-    >
-      <div class="flex items-center justify-between border-b border-[var(--line-soft)] px-5 py-4">
-        <div class="flex items-center gap-3">
-          <span class="font-mono text-sm tracking-[0.08em] text-[var(--ink)] uppercase">
-            all projects
-          </span>
-          <span class="font-mono text-[11px] tabular-nums text-[var(--ink-dim)]">
-            {pad(count)}
-          </span>
-        </div>
-        <span class="sr-only">A list of all projects. Select a project to open its write-up.</span>
-        <span class="font-mono text-[10px] tracking-[0.18em] text-[var(--ink-faint)] uppercase">
-          esc to close
-        </span>
-      </div>
-      <div
-        class="max-h-[calc(85vh-64px)] overflow-y-auto [scrollbar-width:thin] [scrollbar-color:var(--line)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--line)] [&::-webkit-scrollbar-track]:bg-transparent"
-      >
-        {
-          projects.map((p, i) => (
-            <a
-              href={`/projects/${p.slug}`}
-              class={`group/row relative flex flex-col gap-3 border-b border-[var(--line)] px-5 py-5 transition-[background-color] [transition-duration:var(--transition-fast)] last:border-b-0 hover:bg-[var(--surface-3)] ${i % 2 === 1 ? "bg-white/[0.018]" : ""}`}
-            >
-              <!-- left accent rail — invisible at rest, lights up on hover
-                   to anchor the row you're pointing at. -->
-              <span
-                aria-hidden="true"
-                class="absolute left-0 top-0 bottom-0 w-[2px] bg-[var(--ink)] opacity-0 transition-opacity [transition-duration:var(--transition-fast)] group-hover/row:opacity-100"
-              />
-              <div class="flex items-baseline gap-3">
-                <span class="font-mono text-[11px] tabular-nums text-[var(--ink-dim)] transition-colors [transition-duration:var(--transition-fast)] group-hover/row:text-[var(--ink)]">
-                  {pad(i + 1)}
-                </span>
-                <span class="font-serif text-lg font-bold tracking-[-0.02em] text-[var(--ink)] transition-colors [transition-duration:var(--transition-fast)] group-hover/row:text-[var(--ink-soft)]">
-                  {p.title}
-                </span>
-                <span class="ml-auto font-mono text-[11px] tabular-nums text-[var(--ink-dim)]">
-                  {p.year}
-                </span>
-                <span
-                  aria-hidden="true"
-                  class="text-[var(--ink-dim)] transition-[transform,color] [transition-duration:var(--transition-fast)] group-hover/row:translate-x-1 group-hover/row:text-[var(--ink)]"
-                >
-                  ↗
-                </span>
-              </div>
-              <p class="ml-7 font-sans text-[0.88rem] leading-[1.6] text-[var(--ink-muted)]">
-                {p.description}
-              </p>
-              <div class="ml-7 flex flex-wrap gap-1.5">
-                {p.tech.map((t) => (
-                  <span class="inline-flex items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-1 font-mono text-[10px] text-[var(--ink-muted)]">
-                    <TechIcon icon={t.icon} brand={t.brand || "var(--ink-dim)"} size={12} />
-                    {t.label}
-                  </span>
-                ))}
-              </div>
-            </a>
-          ))
-        }
-      </div>
-    </div>
-  </div>
 </project-carousel>
 
 <script>
@@ -485,30 +454,248 @@ const pad = (n: number) => String(n).padStart(2, "0");
     };
   }
 
+  const cardTransition =
+    "transform 620ms cubic-bezier(0.22,1,0.36,1), opacity 520ms var(--ease), filter 520ms var(--ease), border-color 420ms var(--ease), box-shadow 420ms var(--ease)";
+
   class ProjectCarousel extends HTMLElement {
     private cleanupFns: (() => void)[] = [];
     private active = 0;
     private count = 0;
     private slugs: string[] = [];
-    private modalOpen = false;
-    private opener: HTMLElement | null = null;
+    private view: "carousel" | "list" = "carousel";
     private drag: { x: number; moved: number } | null = null;
+    private carouselAnimations: Animation[] = [];
+    private animationFrames: number[] = [];
 
     connectedCallback() {
+      const events = new AbortController();
+      this.cleanupFns.push(() => events.abort());
       this.count = Number(this.dataset.count ?? 0);
       this.slugs = (this.dataset.slugs ?? "").split(",").filter(Boolean);
 
       const stage = this.querySelector<HTMLElement>(".coverflow-stage");
       const cards = Array.from(this.querySelectorAll<HTMLElement>("[data-card]"));
-      const dots = Array.from(this.querySelectorAll<HTMLButtonElement>("[data-dot]"));
       const arrowL = this.querySelector<HTMLButtonElement>('[data-arrow="left"]');
       const arrowR = this.querySelector<HTMLButtonElement>('[data-arrow="right"]');
       const counterIdx = this.querySelector<HTMLElement>("[data-counter-index]");
       const counterSlug = this.querySelector<HTMLElement>("[data-counter-slug]");
-      const openBtn = this.querySelector<HTMLButtonElement>("[data-open-all]");
+      const carouselView = this.querySelector<HTMLElement>("[data-carousel-view]");
+      const listView = this.querySelector<HTMLElement>("[data-list-view]");
+      const listScroll = this.querySelector<HTMLElement>("[data-list-scroll]");
+      const listCards = Array.from(this.querySelectorAll<HTMLElement>("[data-list-card]"));
+      const viewToggle = this.querySelector<HTMLButtonElement>("[data-view-toggle]");
+      const viewLabel = this.querySelector<HTMLElement>("[data-view-label]");
+      const listIcon = this.querySelector<HTMLElement>('[data-view-icon="list"]');
+      const carouselIcon = this.querySelector<HTMLElement>('[data-view-icon="carousel"]');
       const pad = (n: number) => String(n).padStart(2, "0");
 
       const clamp = (n: number) => Math.max(0, Math.min(this.count - 1, n));
+      const motionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let listObserver: IntersectionObserver | null = null;
+      let visibilityObserver: IntersectionObserver | null = null;
+      let listResizeObserver: ResizeObserver | null = null;
+      let descriptionResizeObserver: ResizeObserver | null = null;
+      let autoplayTimer: number | undefined;
+      let carouselVisible = false;
+      const hoveredCards = new Set<HTMLElement>();
+      const nextFrame = (callback: () => void) => {
+        const frame = requestAnimationFrame(() => {
+          this.animationFrames = this.animationFrames.filter((id) => id !== frame);
+          callback();
+        });
+        this.animationFrames.push(frame);
+      };
+
+      type DescriptionState = {
+        viewport: HTMLElement;
+        paragraph: HTMLElement;
+        toggle: HTMLButtonElement;
+        lines: number;
+        expanded: boolean;
+      };
+      const descriptions = new Map<HTMLElement, DescriptionState>();
+
+      const updateStageHeight = () => {
+        if (!stage) return;
+        const activeCard = cards[this.active];
+        const baseHeight = Number.parseFloat(getComputedStyle(stage).minHeight) || 504;
+        const state = activeCard && descriptions.get(activeCard);
+        const targetDescriptionHeight = Number.parseFloat(state?.viewport.style.height ?? "0") || 0;
+        const currentDescriptionHeight = state?.viewport.offsetHeight ?? 0;
+        const cardHeight = (activeCard?.offsetHeight ?? 0) + targetDescriptionHeight - currentDescriptionHeight;
+        stage.style.height = `${Math.max(baseHeight, cardHeight + 72)}px`;
+      };
+
+      const measureDescription = (article: HTMLElement) => {
+        const state = descriptions.get(article);
+        if (!state || !state.paragraph.isConnected) return;
+        const fullHeight = state.paragraph.scrollHeight;
+        if (!fullHeight) return; // The list cannot be measured while hidden.
+        const lineHeight = Number.parseFloat(getComputedStyle(state.paragraph).lineHeight);
+        const collapsedHeight = Math.min(fullHeight, Math.ceil(lineHeight * state.lines));
+        const hasOverflow = fullHeight > collapsedHeight + 2;
+        if (!hasOverflow) state.expanded = false;
+        state.toggle.hidden = !hasOverflow;
+        state.toggle.textContent = state.expanded ? "Read less" : "Read more";
+        state.toggle.setAttribute("aria-expanded", String(state.expanded));
+        state.viewport.style.height = `${state.expanded ? fullHeight : collapsedHeight}px`;
+      };
+
+      const setExpanded = (article: HTMLElement, expanded: boolean) => {
+        const state = descriptions.get(article);
+        if (!state) return;
+        state.expanded = expanded;
+        measureDescription(article);
+        updateStageHeight();
+        updateListCue();
+        scheduleAutoplay();
+      };
+
+      const registerDescriptions = (articles: HTMLElement[], lines: number) => {
+        articles.forEach((article) => {
+          const viewport = article.querySelector<HTMLElement>("[data-description-viewport]");
+          const paragraph = article.querySelector<HTMLElement>("[data-description]");
+          const toggle = article.querySelector<HTMLButtonElement>("[data-description-toggle]");
+          if (!viewport || !paragraph || !toggle) return;
+          descriptions.set(article, { viewport, paragraph, toggle, lines, expanded: false });
+          toggle.addEventListener("click", (event) => {
+            event.stopPropagation();
+            setExpanded(article, !descriptions.get(article)?.expanded);
+          }, { signal: events.signal });
+        });
+      };
+
+      const scheduleAutoplay = () => {
+        if (autoplayTimer !== undefined) window.clearTimeout(autoplayTimer);
+        autoplayTimer = undefined;
+        stage?.setAttribute("aria-live", this.contains(document.activeElement) ? "polite" : "off");
+        if (
+          this.count < 2 || this.view !== "carousel" || !carouselVisible ||
+          document.hidden || motionPreference.matches || hoveredCards.size > 0 ||
+          this.contains(document.activeElement) || descriptions.get(cards[this.active])?.expanded
+        ) return;
+        autoplayTimer = window.setTimeout(() => {
+          autoplayTimer = undefined;
+          goTo((this.active + 1) % this.count, false);
+        }, 3000);
+      };
+
+      registerDescriptions(cards, 3);
+      registerDescriptions(listCards, 2);
+      descriptionResizeObserver = new ResizeObserver((entries) => {
+        entries.forEach((entry) => {
+          const article = (entry.target as HTMLElement).closest<HTMLElement>("[data-card], [data-list-card]");
+          if (article) measureDescription(article);
+        });
+        updateStageHeight();
+        updateListCue();
+      });
+      descriptions.forEach(({ paragraph }) => descriptionResizeObserver?.observe(paragraph));
+
+      const updateListCue = () => {
+        if (!listView || !listScroll) return;
+        const hasMore = listScroll.scrollHeight - listScroll.clientHeight > 2;
+        const atEnd = listScroll.scrollTop >= listScroll.scrollHeight - listScroll.clientHeight - 2;
+        listView.toggleAttribute("data-list-scrollable", hasMore);
+        listView.toggleAttribute("data-list-at-end", !hasMore || atEnd);
+      };
+
+      const animateListCards = () => {
+        listObserver?.disconnect();
+        listCards.forEach((card) => {
+          card.removeAttribute("data-list-visible");
+          card.style.removeProperty("--list-delay");
+        });
+
+        if (motionPreference.matches || !listScroll) {
+          listCards.forEach((card) => card.setAttribute("data-list-visible", ""));
+          return;
+        }
+
+        listObserver = new IntersectionObserver(
+          (entries) => {
+            entries
+              .filter((entry) => entry.isIntersecting)
+              .sort(
+                (a, b) =>
+                  listCards.indexOf(a.target as HTMLElement) -
+                  listCards.indexOf(b.target as HTMLElement),
+              )
+              .forEach((entry, index) => {
+                const card = entry.target as HTMLElement;
+                card.style.setProperty("--list-delay", `${index * 70}ms`);
+                card.setAttribute("data-list-visible", "");
+                listObserver?.unobserve(card);
+              });
+          },
+          { root: listScroll, threshold: 0.12 },
+        );
+        listCards.forEach((card) => listObserver?.observe(card));
+      };
+
+      const animateCarouselCards = () => {
+        this.carouselAnimations.forEach((animation) => animation.cancel());
+        this.carouselAnimations = [];
+        if (motionPreference.matches) return;
+
+        cards.forEach((card, index) => {
+          const offset = Math.abs(index - this.active);
+          if (offset > 1) return;
+
+          const finalTransform = card.style.transform;
+          const finalOpacity = Number(card.style.opacity || "1");
+          const animation = card.animate(
+            [
+              {
+                opacity: 0,
+                transform: `${finalTransform} translateY(0.75rem) scale(0.96)`,
+              },
+              { opacity: finalOpacity, transform: finalTransform },
+            ],
+            {
+              duration: offset === 0 ? 420 : 380,
+              delay: offset === 0 ? 0 : 80,
+              easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+              fill: "both",
+            },
+          );
+          animation.onfinish = () => animation.cancel();
+          this.carouselAnimations.push(animation);
+        });
+      };
+
+      const setView = (view: "carousel" | "list") => {
+        descriptions.forEach((state, article) => {
+          if (state.expanded) setExpanded(article, false);
+        });
+        this.view = view;
+        const showingList = view === "list";
+        carouselView?.toggleAttribute("hidden", showingList);
+        listView?.toggleAttribute("hidden", !showingList);
+        viewToggle?.setAttribute("aria-pressed", String(showingList));
+        viewToggle?.setAttribute(
+          "aria-label",
+          showingList ? "switch to carousel view" : "switch to list view",
+        );
+        if (viewLabel) viewLabel.textContent = showingList ? "carousel view" : "list view";
+        listIcon?.toggleAttribute("hidden", showingList);
+        carouselIcon?.toggleAttribute("hidden", !showingList);
+        if (showingList) {
+          nextFrame(() => {
+            listCards.forEach(measureDescription);
+            updateListCue();
+            animateListCards();
+          });
+        } else {
+          listObserver?.disconnect();
+          nextFrame(() => {
+            cards.forEach(measureDescription);
+            updateStageHeight();
+            animateCarouselCards();
+          });
+        }
+        scheduleAutoplay();
+      };
 
       const render = () => {
         cards.forEach((card, i) => {
@@ -521,53 +708,82 @@ const pad = (n: number) => String(n).padStart(2, "0");
           card.style.pointerEvents = t.pointerEvents;
           card.style.filter = t.filter;
           card.style.cursor = isActive ? "default" : "pointer";
+          card.style.transition = motionPreference.matches ? "none" : cardTransition;
           if (isActive) card.setAttribute("data-active", "");
           else card.removeAttribute("data-active");
           if (isActive) card.removeAttribute("aria-hidden");
           else card.setAttribute("aria-hidden", "true");
+          card.querySelectorAll<HTMLAnchorElement | HTMLButtonElement>("a, [data-description-toggle]").forEach((control) => {
+            control.tabIndex = isActive ? 0 : -1;
+          });
           const actions = card.querySelector(".card-actions");
           actions?.classList.toggle("opacity-100", isActive);
           actions?.classList.toggle("opacity-40", !isActive);
-        });
-        dots.forEach((dot, i) => {
-          dot.style.width = i === this.active ? "24px" : "8px";
-          dot.style.background =
-            i === this.active ? "var(--ink)" : "var(--line)";
         });
         if (arrowL) arrowL.disabled = this.active === 0;
         if (arrowR) arrowR.disabled = this.active === this.count - 1;
         if (counterIdx) counterIdx.textContent = pad(this.active + 1);
         if (counterSlug) counterSlug.textContent = this.slugs[this.active] ?? "";
+        updateStageHeight();
       };
 
       const go = (dir: 1 | -1) => {
-        const next = clamp(this.active + dir);
-        if (next !== this.active) {
-          playSound("click");
-          this.active = next;
-          render();
-        }
+        goTo(clamp(this.active + dir));
       };
-      const goTo = (i: number) => {
+      const goTo = (i: number, withSound = true) => {
         const next = clamp(i);
         if (next !== this.active) {
-          playSound("click");
+          if (withSound) playSound("click");
+          if (descriptions.get(cards[this.active])?.expanded) {
+            setExpanded(cards[this.active], false);
+          }
           this.active = next;
           render();
         }
+        scheduleAutoplay();
       };
 
       // ── controls ─────────────────────────────────────────────────
-      arrowL?.addEventListener("click", () => go(-1));
-      arrowR?.addEventListener("click", () => go(1));
-      dots.forEach((dot) =>
-        dot.addEventListener("click", () => goTo(Number(dot.dataset.dot))),
-      );
-      openBtn?.addEventListener("mouseenter", () => playSound("hover"));
-      openBtn?.addEventListener("click", () => {
-        this.setModal(true);
+      arrowL?.addEventListener("click", () => go(-1), { signal: events.signal });
+      arrowR?.addEventListener("click", () => go(1), { signal: events.signal });
+      viewToggle?.addEventListener("mouseenter", () => playSound("hover"), { signal: events.signal });
+      viewToggle?.addEventListener("click", () => {
+        setView(this.view === "carousel" ? "list" : "carousel");
         playSound("click");
+      }, { signal: events.signal });
+      listScroll?.addEventListener("scroll", updateListCue, { passive: true, signal: events.signal });
+      this.cleanupFns.push(() => {
+        listObserver?.disconnect();
+        listResizeObserver?.disconnect();
+        descriptionResizeObserver?.disconnect();
+        visibilityObserver?.disconnect();
+        if (autoplayTimer !== undefined) window.clearTimeout(autoplayTimer);
       });
+
+      if (listScroll?.firstElementChild) {
+        listResizeObserver = new ResizeObserver(updateListCue);
+        listResizeObserver.observe(listScroll.firstElementChild);
+      }
+      if (stage) {
+        visibilityObserver = new IntersectionObserver(([entry]) => {
+          carouselVisible = Boolean(entry?.isIntersecting && entry.intersectionRatio >= 0.2);
+          scheduleAutoplay();
+        }, { threshold: [0, 0.2] });
+        visibilityObserver.observe(stage);
+      }
+      document.addEventListener("visibilitychange", scheduleAutoplay, { signal: events.signal });
+      motionPreference.addEventListener("change", () => {
+        render();
+        scheduleAutoplay();
+      }, { signal: events.signal });
+      this.addEventListener("focusin", scheduleAutoplay, { signal: events.signal });
+      this.addEventListener("focusout", () => queueMicrotask(scheduleAutoplay), { signal: events.signal });
+      window.addEventListener("resize", () => {
+        cards.forEach(measureDescription);
+        if (this.view === "list") listCards.forEach(measureDescription);
+        updateStageHeight();
+        updateListCue();
+      }, { signal: events.signal });
 
       // ── keyboard ←/→ when the stage is focused ───────────────────
       stage?.addEventListener("keydown", (e) => {
@@ -578,83 +794,58 @@ const pad = (n: number) => String(n).padStart(2, "0");
           e.preventDefault();
           go(-1);
         }
-      });
+      }, { signal: events.signal });
 
       // ── pointer drag / swipe ─────────────────────────────────────
       stage?.addEventListener("pointerdown", (e) => {
+        if ((e.target as Element).closest("button, a")) return;
         this.drag = { x: e.clientX, moved: 0 };
         try {
           stage.setPointerCapture(e.pointerId);
         } catch {
           /* pointer already released */
         }
-      });
+      }, { signal: events.signal });
       stage?.addEventListener("pointermove", (e) => {
         if (!this.drag) return;
         this.drag.moved = e.clientX - this.drag.x;
-      });
+      }, { signal: events.signal });
       const endDrag = () => {
         if (!this.drag) return;
         const m = this.drag.moved;
         this.drag = null;
         if (Math.abs(m) > 60) go(m < 0 ? 1 : -1);
       };
-      stage?.addEventListener("pointerup", endDrag);
-      stage?.addEventListener("pointercancel", endDrag);
+      stage?.addEventListener("pointerup", endDrag, { signal: events.signal });
+      stage?.addEventListener("pointercancel", endDrag, { signal: events.signal });
 
       // ── card hover sound + click-to-focus ────────────────────────
       cards.forEach((card, i) => {
-        card.addEventListener("mouseenter", () => playSound("hover"));
+        card.addEventListener("pointerenter", (event) => {
+          if (event.pointerType === "touch") return;
+          hoveredCards.add(card);
+          scheduleAutoplay();
+          playSound("hover");
+        }, { signal: events.signal });
+        card.addEventListener("pointerleave", () => {
+          hoveredCards.delete(card);
+          scheduleAutoplay();
+        }, { signal: events.signal });
         card.addEventListener("click", () => {
           if (i !== this.active) goTo(i);
-        });
+        }, { signal: events.signal });
       });
 
-      // ── "view all" modal ─────────────────────────────────────────
-      this.querySelector("[data-close-all]")?.addEventListener("click", () =>
-        this.setModal(false),
-      );
-      const onKey = (e: KeyboardEvent) => {
-        if (e.key === "Escape" && this.modalOpen) this.setModal(false);
-      };
-      window.addEventListener("keydown", onKey);
-      this.cleanupFns.push(() => {
-        window.removeEventListener("keydown", onKey);
-        // safety net if the element disconnects while open
-        if (this.modalOpen) {
-          window.__lenis?.start();
-          document.body.style.overflow = "";
-        }
-      });
-
+      cards.forEach(measureDescription);
       render();
-    }
-
-    // Lenis intercepts wheel events globally, so scrolling inside the
-    // modal's list would ALSO scroll the page underneath. We stop
-    // Lenis while the modal is open and restore it on close. Also
-    // toggles `overflow:hidden` on <body> as a belt-and-suspenders
-    // lock for non-Lenis (reduced-motion) sessions.
-    private setModal(open: boolean) {
-      this.modalOpen = open;
-      const lenis = window.__lenis;
-      const modal = this.querySelector<HTMLElement>(".pm-root");
-      const modalPanel = this.querySelector<HTMLElement>(".pm-panel");
-      if (open) {
-        this.opener = document.activeElement as HTMLElement | null;
-        lenis?.stop();
-        document.body.style.overflow = "hidden";
-        modal?.removeAttribute("hidden");
-        modalPanel?.focus();
-      } else {
-        lenis?.start();
-        document.body.style.overflow = "";
-        modal?.setAttribute("hidden", "");
-        this.opener?.focus?.();
-      }
+      scheduleAutoplay();
     }
 
     disconnectedCallback() {
+      this.animationFrames.forEach(cancelAnimationFrame);
+      this.animationFrames = [];
+      this.carouselAnimations.forEach((animation) => animation.cancel());
+      this.carouselAnimations = [];
       this.cleanupFns.forEach((fn) => fn());
       this.cleanupFns = [];
     }
@@ -665,7 +856,67 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
 <style>
   .coverflow-stage {
+    min-height: 31.5rem;
+    overflow: visible;
     perspective: 1400px;
     perspective-origin: 50% 45%;
+    transition: height 380ms var(--ease-out);
+  }
+
+  .project-description-viewport {
+    overflow: hidden;
+    transition: height 360ms var(--ease-out);
+  }
+
+  .project-description-toggle[hidden] {
+    display: none;
+  }
+
+  .project-tech-chip {
+    min-height: 1.75rem;
+    white-space: nowrap;
+  }
+
+  [data-list-fade] {
+    opacity: 0;
+  }
+
+  [data-list-view][data-list-scrollable]:not([data-list-at-end]) [data-list-fade] {
+    opacity: 1;
+  }
+
+  .project-view--list:not([hidden]) [data-list-card] {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+
+  .project-view--list:not([hidden]) [data-list-card][data-list-visible] {
+    animation: project-list-card-in 440ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: var(--list-delay, 0ms);
+  }
+
+  @keyframes project-list-card-in {
+    from {
+      opacity: 0;
+      transform: translateY(1rem);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .coverflow-stage,
+    .project-description-viewport {
+      transition: none;
+    }
+
+    .project-view--list:not([hidden]) [data-list-card] {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
   }
 </style>

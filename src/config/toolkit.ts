@@ -62,7 +62,7 @@ export const toolGroups: ToolGroup[] = [
     id: "frontend",
     label: "// frontend",
     tools: [
-      { name: "react", icon: "react", brand: "#61DAFB", years: 3, description: "What I reach for when a backend needs a real admin UI. This very site is Next.js + React. I keep client state lean (server components + fetch) and only reach for state libs when the problem actually demands it." },
+      { name: "react", icon: "react", brand: "#61DAFB", years: 3, description: "What I reach for when a backend needs a real admin UI. This very site is Astro. I keep client state lean (server-rendered islands + fetch) and only reach for state libs when the problem actually demands it." },
       { name: "typescript", icon: "typescript", brand: "#3178C6", years: 3 },
       { name: "astro", icon: "astro", brand: "#FF5D01", years: 1 },
       { name: "tailwind", icon: "tailwindcss", brand: "#06B6D4", years: 2 },

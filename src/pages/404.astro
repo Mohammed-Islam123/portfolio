@@ -8,6 +8,7 @@
  */
 import { siteConfig } from "../config/site";
 import Layout from "../layouts/Layout.astro";
+import UiIcon from "../components/icons/UiIcon.astro";
 ---
 
 <Layout title={`Not Found · ${siteConfig.name}`}>
@@ -40,7 +41,7 @@ import Layout from "../layouts/Layout.astro";
 `}</pre>
 
       <!-- error label -->
-      <p class="font-mono text-[11px] tracking-[0.42em] text-[var(--ink-dim)] uppercase">
+      <p class="font-mono text-xs tracking-[0.42em] text-[var(--ink-dim)] uppercase">
         // error · not_found
       </p>
 
@@ -73,7 +74,7 @@ import Layout from "../layouts/Layout.astro";
           href="/"
           class="group/home inline-flex items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--signal)] px-4 py-2.5 text-[var(--bg)] transition-transform [transition-duration:var(--transition-fast)] hover:scale-[1.02]"
         >
-          <span aria-hidden="true">›</span>
+          <span aria-hidden="true"><UiIcon name="chevron-right" size={12} /></span>
           <span>back home</span>
         </a>
         <a href="/#projects" class="cmd-link text-sm">

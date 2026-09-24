@@ -1,0 +1,406 @@
+---
+title: "PostgreSQL Performance: Indexes, EXPLAIN, and the Queries You Should Stop Writing"
+description: "A practical guide to making PostgreSQL fast — index strategy, reading EXPLAIN ANALYZE, and the query patterns that quietly destroy performance."
+pubDate: 2025-10-15
+tags: ["PostgreSQL", "Databases", "Performance", "Backend", "Best Practices"]
+thumbnail: ./feature.svg
+thumbnailAlt: "PostgreSQL Performance — feature illustration"
+draft: false
+---
+
+import Note from '../../../components/mdx/Note.astro';
+import Figure from '../../../components/mdx/Figure.astro';
+import featureImg from './feature.svg';
+
+PostgreSQL is fast. Most "slow database" problems I've seen in production
+were not database problems — they were index problems, query problems,
+or schema problems. The database was doing exactly what it was told,
+and what it was told was wrong.
+
+This post covers three things: how to design indexes that actually
+help, how to read `EXPLAIN ANALYZE` without panicking, and the query
+patterns that quietly destroy performance even when the schema is
+correct.
+
+## The index strategy question
+
+The most common index mistake is **not having an index strategy**. You
+add indexes reactively — "this query is slow, let me index the column"
+— until you have fifteen indexes on a table that's now slow to write
+to, and the original query is still slow because the index you added
+doesn't match the query's predicate.
+
+A real index strategy answers three questions:
+
+1. **What are the access patterns?** (Which columns are filtered, joined,
+   ordered, or grouped?)
+2. **Which indexes serve multiple queries?** (A composite index on
+   `(tenant_id, created_at)` serves both "recent rows for tenant X" and
+   "rows for tenant X in date range Y.")
+3. **What's the write cost?** (Every index adds work to every INSERT,
+   UPDATE, and DELETE. The tradeoff is read speed vs. write speed +
+   storage.)
+
+<Note variant="note">
+Rule of thumb: a table that's read-heavy can afford many indexes; a
+table that's write-heavy (logs, events, audit trails) should have few.
+If a write-heavy table needs an index for analytics, consider a read
+replica instead.
+</Note>
+
+### B-tree (the default) — when to use it
+
+The default index type. Good for equality (`=`), range (`<`, `>`,
+`BETWEEN`), and `IS NULL` checks. Use it for:
+
+- Primary keys (auto-created)
+- Foreign keys (NOT auto-created — you have to add them)
+- Columns frequently filtered in `WHERE` clauses
+- Columns frequently used in `ORDER BY`
+
+```sql
+-- ✅ Good: composite B-tree for a common access pattern
+CREATE INDEX idx_orders_tenant_created
+  ON orders (tenant_id, created_at DESC);
+
+-- Serves:
+--   SELECT * FROM orders WHERE tenant_id = $1 ORDER BY created_at DESC;
+--   SELECT * FROM orders WHERE tenant_id = $1 AND created_at > $2;
+--   SELECT * FROM orders WHERE tenant_id = $1;
+-- (but NOT: SELECT * FROM orders WHERE created_at > $2; — leading column missing)
+```
+
+### GIN — for full-text search and JSON
+
+A Generalized Inverted Index is the right choice when you're searching
+inside a composite value — a full-text search vector, a JSONB document,
+or an array.
+
+```sql
+-- Full-text search on a blog post
+ALTER TABLE posts ADD COLUMN search_vector tsvector
+  GENERATED ALWAYS AS (
+    to_tsvector('english', coalesce(title, '') || ' ' || coalesce(body, ''))
+  ) STORED;
+
+CREATE INDEX idx_posts_search ON posts USING gin(search_vector);
+
+-- Now this query is fast:
+SELECT * FROM posts WHERE search_vector @@ to_tsquery('english', 'postgres & index');
+```
+
+```sql
+-- JSONB containment queries
+CREATE INDEX idx_events_payload ON events USING gin(payload);
+
+-- Now this query uses the index:
+SELECT * FROM events WHERE payload @> '{"event_type": "signup"}';
+```
+
+<Note variant="tip">
+GIN indexes are powerful but expensive to maintain — each INSERT updates
+an inverted list rather than a single B-tree node. For write-heavy
+tables, consider `gin_pending_list_limit` and batch your inserts.
+</Note>
+
+### Partial indexes — for the queries that matter
+
+If 95% of your queries filter on `WHERE status = 'active'`, don't index
+all rows — index only the active ones. The index is smaller, faster to
+scan, and cheaper to maintain.
+
+```sql
+-- ✅ Partial index: only active users
+CREATE INDEX idx_users_active_email ON users (email)
+  WHERE status = 'active';
+
+-- This query uses the partial index:
+SELECT * FROM users WHERE status = 'active' AND email = 'foo@bar.com';
+
+-- This query does NOT use it (the filter doesn't match):
+SELECT * FROM users WHERE email = 'foo@bar.com';
+```
+
+### Covering indexes (INCLUDE) — avoid the heap lookup
+
+When a query only needs a few columns, you can include them in the
+index itself — PostgreSQL can answer the query from the index alone,
+without fetching the row from the heap.
+
+```sql
+-- ✅ Covering index: id + email + created_at, no heap lookup needed
+CREATE INDEX idx_users_active_email_covering
+  ON users (email)
+  INCLUDE (id, created_at)
+  WHERE status = 'active';
+
+-- This query is now index-only:
+SELECT id, email, created_at FROM users WHERE status = 'active' AND email = $1;
+```
+
+<Figure src={featureImg} alt="Diagram showing a B-tree index with included columns, avoiding a heap fetch." caption="A covering index with INCLUDE. The leaf node carries the indexed column (email) plus the included columns (id, created_at). The query never touches the heap — fewer disk seeks, faster reads." />
+
+## Reading EXPLAIN ANALYZE
+
+`EXPLAIN ANALYZE` runs the query and shows you the actual plan + timing.
+Without it, you're guessing. With it, you can see exactly where the
+time goes.
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+SELECT u.email, COUNT(o.id) AS order_count
+FROM users u
+LEFT JOIN orders o ON o.user_id = u.id
+WHERE u.status = 'active'
+GROUP BY u.email
+ORDER BY order_count DESC
+LIMIT 20;
+```
+
+The output looks like this (simplified):
+
+```
+Limit  (cost=1245.32..1245.52 rows=20 width=48) (actual time=42.118..42.124 rows=20 loops=1)
+  ->  Sort  (cost=1245.32..1248.10 rows=1112 width=48) (actual time=42.116..42.120 rows=20 loops=1)
+        Sort Key: (count(o.id)) DESC
+        Sort Method: top-N heapsort  Memory: 27kB
+        ->  Hash Join  (cost=580.45..1230.18 rows=1112 width=48) (actual time=18.234..38.012 rows=9456 loops=1)
+              Hash Cond: (o.user_id = u.id)
+              ->  Seq Scan on orders o  (cost=0.00..520.30 rows=30045 width=8) (actual time=0.012..8.234 rows=30045 loops=1)
+              ->  Hash  (cost=450.20..450.20 rows=11000 width=40) (actual time=8.102..8.105 rows=11000 loops=1)
+                    ->  Seq Scan on users u  (cost=0.00..450.20 rows=11000 width=40) (actual time=0.020..4.567 rows=11000 loops=1)
+                          Filter: (status = 'active')
+                          Rows Removed by Filter: 245
+Planning Time: 0.412 ms
+Execution Time: 42.156 ms
+```
+
+Three things to look at:
+
+1. **`Seq Scan`** — sequential scan. Often fine for small tables, but
+   a red flag on large tables. If you see `Seq Scan on orders` where
+   `orders` has 10M rows, you're missing an index.
+2. **`actual time`** — the actual execution time. The two numbers are
+   the time to the first row and the time to the last row. A big gap
+   means the operation is slow to start but fast to stream — typical
+   of a sort.
+3. **`Rows Removed by Filter`** — how many rows the database read and
+   then threw away. If this number is 100x the number of rows kept,
+   your index isn't selective enough.
+
+<Note variant="warn">
+`EXPLAIN` without `ANALYZE` only shows the planner's estimate. Always
+use `EXPLAIN ANALYZE` for tuning — the actual numbers often differ
+wildly from the estimates, especially if your statistics are stale.
+</Note>
+
+### Fixing the example above
+
+The `Seq Scan on orders` is the bottleneck — 30,045 rows scanned to
+feed the join. Adding an index on `orders(user_id)` lets the planner
+use a nested loop with an index lookup instead:
+
+```sql
+CREATE INDEX idx_orders_user_id ON orders (user_id);
+```
+
+After the index, the plan changes:
+
+```
+Limit  (cost=320.45..320.65 rows=20 width=48) (actual time=8.234..8.240 rows=20 loops=1)
+  ->  Sort  (cost=320.45..321.10 rows=260 width=48) (actual time=8.232..8.236 rows=20 loops=1)
+        Sort Key: (count(o.id)) DESC
+        ->  Hash Join  (cost=280.20..315.40 rows=260 width=48) (actual time=4.102..7.234 rows=9456 loops=1)
+              Hash Cond: (o.user_id = u.id)
+              ->  Index Only Scan using idx_orders_user_id on orders o  (...)
+              ->  Hash  (...)
+```
+
+Execution time drops from 42ms to 8ms — 5x faster, just from one index.
+
+## The query patterns that quietly destroy performance
+
+### 1. `SELECT *` on a wide table
+
+`SELECT *` fetches every column, even the ones you don't need. On a
+table with `text`/`jsonb` columns, this means reading megabytes of
+data you'll throw away.
+
+```sql
+-- ❌ Reads all columns including the 2KB bio field
+SELECT * FROM users WHERE id = $1;
+
+-- ✅ Reads only what you need
+SELECT id, email, name FROM users WHERE id = $1;
+```
+
+This matters most when the query returns many rows. A `SELECT *` on
+1,000 rows of a 4KB-row table ships 4MB. The same query reading only
+the 100 bytes you need ships 100KB.
+
+### 2. N+1 queries
+
+The classic. You fetch a list of users, then for each user you fetch
+their orders. 1 query becomes 1,001 queries.
+
+```csharp
+// ❌ N+1: 1 + N queries
+var users = await db.Users.Take(100).ToListAsync();
+foreach (var user in users)
+{
+    user.Orders = await db.Orders
+        .Where(o => o.UserId == user.Id)
+        .ToListAsync();
+}
+
+// ✅ Eager load: 1 query with a JOIN
+var users = await db.Users
+    .Include(u => u.Orders)
+    .Take(100)
+    .ToListAsync();
+```
+
+The fix is always the same: tell the ORM to fetch the related data in
+one query, either via `Include` (EF Core), `select_related` (Django),
+or a manual `JOIN`.
+
+### 3. `COUNT(*)` on a large table
+
+`COUNT(*)` is slow on large tables because PostgreSQL has to scan
+every row (the MVCC model means there's no accurate count cached).
+
+```sql
+-- ❌ Slow on a 10M row table — scans the whole table
+SELECT COUNT(*) FROM orders WHERE status = 'pending';
+
+-- ✅ Estimate — uses table statistics, instant
+SELECT reltuples::bigint AS approx_count
+FROM pg_class WHERE relname = 'orders';
+
+-- ✅ Or maintain a count table for the exact value
+CREATE TABLE order_counts (status text primary key, count bigint);
+-- Updated via trigger
+```
+
+<Note variant="tip">
+For UI pagination, use "approximate count" — show "about 10,000 results"
+instead of "10,043 results." Users don't care about the exact number;
+they care that the page loaded in 50ms instead of 5s.
+</Note>
+
+### 4. `OFFSET ... LIMIT` for deep pagination
+
+`OFFSET 100000 LIMIT 20` scans 100,020 rows and throws away 100,000.
+For deep pagination, use **keyset pagination** — remember the last
+seen row and ask for the next page after it.
+
+```sql
+-- ❌ Slow for page 5000 — scans 100,000 rows
+SELECT id, email FROM users
+ORDER BY id
+LIMIT 20 OFFSET 100000;
+
+-- ✅ Keyset — uses the index, scans only 20 rows
+SELECT id, email FROM users
+WHERE id > $last_seen_id
+ORDER BY id
+LIMIT 20;
+```
+
+The keyset version is O(log n + 20); the OFFSET version is O(n + 20).
+For a 1M-row table, the difference is milliseconds vs. seconds.
+
+### 5. Functions on indexed columns
+
+An index on `email` doesn't help if you filter on `LOWER(email)` —
+the function invalidates the index. Use an expression index instead.
+
+```sql
+-- ❌ Index on (email) is useless here — LOWER(email) breaks it
+SELECT * FROM users WHERE LOWER(email) = 'foo@bar.com';
+
+-- ✅ Expression index on LOWER(email)
+CREATE INDEX idx_users_email_lower ON users (LOWER(email));
+```
+
+### 6. `LIKE '%foo%'` — leading wildcard
+
+A leading wildcard means the index can't be used — the database has
+to scan every row to check if the substring exists. Use trigram indexes
+(`pg_trgm`) or full-text search instead.
+
+```sql
+-- ❌ Seq scan — leading wildcard breaks the index
+SELECT * FROM posts WHERE body LIKE '%postgres%';
+
+-- ✅ Trigram index — supports substring search
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX idx_posts_body_trgm ON posts USING gin(body gin_trgm_ops);
+
+SELECT * FROM posts WHERE body ILIKE '%postgres%';
+```
+
+## Vacuum and statistics
+
+PostgreSQL uses MVCC — deleted rows aren't immediately removed from
+disk; they're marked as dead and cleaned up later by `autovacuum`. If
+autovacuum falls behind (common on write-heavy tables), the table
+bloats and queries slow down.
+
+Check for bloat:
+
+```sql
+SELECT
+  relname,
+  n_live_tup,
+  n_dead_tup,
+  ROUND(n_dead_tup::numeric / NULLIF(n_live_tup, 0) * 100, 2) AS dead_pct
+FROM pg_stat_user_tables
+WHERE n_live_tup > 1000
+ORDER BY dead_pct DESC;
+```
+
+If `dead_pct` is over 10%, autovacuum is falling behind. Either tune
+the autovacuum settings for that table, or run a manual `VACUUM
+ANALYZE` during low-traffic hours.
+
+```sql
+-- Tune autovacuum for a specific table
+ALTER TABLE events SET (
+  autovacuum_vacuum_scale_factor = 0.05,  -- vacuum at 5% dead rows (default 20%)
+  autovacuum_analyze_scale_factor = 0.02  -- analyze at 2% changes (default 10%)
+);
+```
+
+<Note variant="note">
+`ANALYZE` updates the planner's statistics — the estimates it uses to
+pick query plans. If your stats are stale, the planner may pick a seq
+scan when an index would be better. `VACUUM ANALYZE` does both: cleans
+dead rows + refreshes stats.
+</Note>
+
+## Closing
+
+PostgreSQL is fast when you give it the right indexes and the right
+queries. The database isn't magic — it can't use an index that doesn't
+match your predicate, and it can't avoid a seq scan if your query
+forces one.
+
+The workflow that works for me:
+
+1. **Start with the access pattern.** What queries will run? What columns
+   will they filter, join, order, group?
+2. **Design indexes to match.** Composite indexes with the most selective
+   column first; covering indexes for hot queries; partial indexes for
+   filtered access patterns.
+3. **`EXPLAIN ANALYZE` every slow query.** Don't guess — measure. The
+   output is intimidating at first but reveals everything.
+4. **Watch for the anti-patterns.** `SELECT *`, N+1, `OFFSET` pagination,
+   `LIKE '%...'`, functions on indexed columns. Each one quietly
+   destroys performance until someone notices.
+5. **Vacuum and analyze.** MVCC means dead rows accumulate; the planner
+   needs fresh stats to pick good plans.
+
+Do these five things and most "database is slow" problems disappear.
+The remaining 5% are usually schema design issues — and that's a post
+for another day.

@@ -1,0 +1,111 @@
+---
+title: "Designing Data Paths"
+description: "How to think about the routes data takes through a system, and why the boring path is usually the right one."
+pubDate: 2025-09-05
+tags: ["System Design", "Architecture", "Distributed Systems", "Backend"]
+thumbnail: ./feature.svg
+thumbnailAlt: "Designing Data Paths — feature illustration"
+draft: false
+---
+
+Every backend system is, at its core, a graph of data paths. Requests come
+in, get transformed, get validated, get persisted, get broadcast, get
+retried. The shape of those paths determines everything — latency,
+reliability, observability, and the team's ability to reason about the
+system at 3am.
+
+This post is about the patterns I keep coming back to, and the ones I keep
+seeing go wrong.
+
+## The first question: where does the data live?
+
+Before you draw a single arrow, answer this question. "Where is the source
+of truth for this piece of data?" If the answer is "in two places," you
+have a bug waiting to happen. If the answer is "in three places," you have
+a bug that's already happening, you just haven't noticed yet.
+
+The transactional outbox pattern exists because of this question. You have
+a database (source of truth) and a message broker (fast distribution). The
+naive approach is to write to both — and the naive approach is wrong,
+because the broker write can fail after the database commit succeeds. Now
+you have a database that says "this happened" and a broker that says "this
+didn't," and downstream consumers are out of sync forever.
+
+import Note from '../../../components/mdx/Note.astro';
+
+<Note variant="warn">
+Dual writes are never safe. Even if both writes succeed 99.99% of the time,
+the 0.01% failure rate is silent, unrecoverable, and will eventually bite
+you. Use a transactional outbox, change data capture, or accept the
+inconsistency explicitly.
+</Note>
+
+The outbox pattern is simple: write the business data and an "outbox row"
+in the same database transaction. A separate process reads the outbox and
+publishes to the broker. The transaction guarantees atomicity — either
+both writes happen, or neither does. The outbox row is the durable record
+that the broker write is still pending.
+
+## The second question: who is allowed to read this?
+
+Once data exists, it has readers. Some readers are interactive (a user
+loading a page), some are batch (a nightly report), some are streaming
+(a dashboard that updates every second). Each reader has different latency
+requirements, different freshness tolerances, and different read patterns.
+
+Mixing them is the most common mistake. The transactional database that
+serves interactive reads cannot also serve a nightly batch job that scans
+the last six months of data — the batch job will lock the table, the
+interactive reads will time out, and the on-call engineer will get paged.
+
+The solution is a read model: a separate, denormalized representation of
+the data optimized for the read pattern. The transactional database stays
+clean (one writer, schema designed for writes); the read model stays fast
+(schema designed for queries, often indexed differently). Synchronization
+happens via the outbox pattern from the previous section.
+
+## The third question: what happens when this fails?
+
+Distributed systems fail in three ways:
+
+1. **The slow failure** — a request takes 30 seconds instead of 30
+   milliseconds. The user gives up, but the request is still in flight,
+   consuming resources.
+2. **The partial failure** — half of a multi-step operation succeeds. The
+   database commit went through, but the cache invalidation didn't. Now
+   you have stale data.
+3. **The silent failure** — the request returns 200, but the data was
+   never written. The user thinks it worked. The system thinks it worked.
+   The next day, you discover a missing row.
+
+The first failure is solved by timeouts. The second is solved by
+transactions or compensating actions. The third is solved by
+acknowledgements — never accept a write as "done" until you've verified
+it actually persisted.
+
+import Figure from '../../../components/mdx/Figure.astro';
+import featureImg from './feature.svg';
+
+<Figure src={featureImg} alt="A diagram showing the data path from request through validation, persistence, outbox, and read model." caption="The boring path: request → validate → write to DB + outbox → publish → read model. Every step is durable, every failure is observable." />
+
+## The boring path is usually the right one
+
+There's a temptation, especially in early-stage systems, to build clever
+paths. "Let's skip the outbox and just write to Kafka directly — it's
+faster." "Let's read directly from the transactional database — we don't
+have enough traffic to need a read model yet." "Let's not bother with
+timeouts — the network is fast."
+
+Every one of these shortcuts will cost you later. The boring path — write
+to a transactional database, publish via an outbox, read from a
+denormalized read model, set aggressive timeouts everywhere — is boring
+because it has been tested by thousands of teams before you. It works.
+The clever paths are clever because they're novel, and novel in
+distributed systems usually means "we haven't found the bug yet."
+
+## Closing
+
+The data path is the system. Everything else — the framework, the
+language, the deployment — is incidental complexity. Get the data path
+right, and the rest is plumbing. Get it wrong, and no amount of plumbing
+will save you.

@@ -1,6 +1,7 @@
 /**
  * NAV CONFIG — navigation items + section ids.
  * Used by the nav bar (centered) and scrollspy.
+ *
  */
 
 export type NavItem = {
@@ -17,4 +18,6 @@ export const navItems: NavItem[] = [
   { id: "contact", label: "contact", href: "#contact" },
 ];
 
-export const sectionIds = navItems.map((n) => n.id);
+/** ids the scrollspy should observe (in document order, anchors only) */
+export const sectionIds = navItems
+  .map((n) => n.id);

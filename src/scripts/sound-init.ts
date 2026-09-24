@@ -94,5 +94,6 @@ export function toggleSound(): void {
 }
 
 export function playSound(name: Parameters<typeof sound.play>[0]): void {
+  if (enabled) sound.enable();
   sound.play(name);
 }

@@ -1,3 +1,7 @@
+---
+import { siteConfig } from "../config/site";
+---
+
 <!--
   ScrambleName — the hero name scrambles in on demand, driven by the
   same Scrambler engine as the greeting.
@@ -21,9 +25,10 @@
   class="inline-block text-[var(--ink)]"
   style="min-width: 1em;"
   role="text"
-  aria-label="Mohamed Islam Benyahkem"
+  aria-label={siteConfig.name}
 >
   <span class="sn-text"></span>
+  <noscript><span class="sn-text">{siteConfig.name}</span></noscript>
   <span class="sr-only sn-live" aria-live="polite"></span>
 </scramble-name>
 
@@ -44,6 +49,15 @@
       const isReduced = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
       ).matches;
+      const isClientNavigation =
+        document.documentElement.dataset.loaderState === "dismissed";
+
+      if (isClientNavigation) {
+        textEl.textContent = FULL_NAME;
+        this.style.minWidth = "";
+        liveEl.textContent = FULL_NAME;
+        return;
+      }
 
       // reduced motion — show name statically with a fade. We still
       // wait for the loader:dismiss signal so the timing matches the
@@ -55,9 +69,9 @@
           this.style.minWidth = "";
           liveEl.textContent = FULL_NAME;
         };
-        window.addEventListener("loader:dismiss", onDismiss, { once: true });
-        // safety: if loader isn't mounted, show name after a short delay.
-        const safety = setTimeout(onDismiss, 1500);
+        if (document.documentElement.dataset.loaderState === "dismissed") onDismiss();
+        else window.addEventListener("loader:dismiss", onDismiss, { once: true });
+        const safety = setTimeout(onDismiss, 6000);
         this.cleanupFns.push(() => {
           window.removeEventListener("loader:dismiss", onDismiss);
           clearTimeout(safety);
@@ -86,10 +100,9 @@
         }, 150);
       };
 
-      window.addEventListener("loader:dismiss", onDismiss, { once: true });
-      // safety: if loader fails to mount, fire the scramble after a
-      // fallback window.
-      const safety = setTimeout(onDismiss, 2500);
+      if (document.documentElement.dataset.loaderState === "dismissed") onDismiss();
+      else window.addEventListener("loader:dismiss", onDismiss, { once: true });
+      const safety = setTimeout(onDismiss, 6000);
 
       this.cleanupFns.push(() => {
         window.removeEventListener("loader:dismiss", onDismiss);

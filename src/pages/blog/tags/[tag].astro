@@ -1,0 +1,39 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BlogBar from "../../../components/BlogBar.astro";
+import BlogCard from "../../../components/BlogCard.astro";
+import Reveal from "../../../components/primitives/Reveal.astro";
+import { collectTags, getPosts, postsForTag } from "../../../lib/blog";
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  return collectTags(posts).map(({ slug, name }) => ({ params: { tag: slug }, props: { name } }));
+}
+
+const { tag } = Astro.params;
+const { name } = Astro.props as { name: string };
+const posts = postsForTag(await getPosts(), tag ?? "");
+---
+
+<Layout title={`${name} · Blog · Mohamed Islam`} description={`Posts about ${name}.`}>
+  <BlogBar />
+  <main class="tag-detail">
+    <div class="wrap tag-detail__inner">
+      <Reveal><p class="tag-detail__crumb"><a href="/blog/">Blog</a><span aria-hidden="true">/</span><a href="/blog/tags/">Tags</a></p></Reveal>
+      <Reveal delay={70}><h1>{name}</h1></Reveal>
+      <Reveal delay={120}><p class="tag-detail__count">{posts.length} {posts.length === 1 ? "post" : "posts"} on this topic.</p></Reveal>
+      <div class="tag-detail__list">{posts.map((post, index) => <Reveal delay={Math.min(180 + index * 60, 480)}><BlogCard {post} {index} /></Reveal>)}</div>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .tag-detail { min-height: 100svh; padding: calc(var(--nav-h) + 3rem) 0 4rem; }
+  .tag-detail__inner { max-width: 72rem; }
+  .tag-detail__crumb { display: flex; gap: 0.45rem; margin: 0; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-dim); }
+  .tag-detail__crumb a { color: var(--ink-muted); text-decoration: none; }
+  .tag-detail__crumb a:hover { color: var(--ink); }
+  h1 { margin: 0.75rem 0 0; font-family: var(--font-display); font-size: clamp(2.5rem, 7vw, 5rem); font-weight: 650; letter-spacing: -0.05em; line-height: 1; color: var(--ink); overflow-wrap: anywhere; }
+  .tag-detail__count { margin: 1rem 0 0; color: var(--ink-muted); }
+  .tag-detail__list { margin-top: 2.5rem; }
+</style>

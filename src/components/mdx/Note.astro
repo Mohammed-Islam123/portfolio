@@ -1,0 +1,68 @@
+---
+/**
+ * Note — callout box for markdown/MDX posts. Three variants:
+ *
+ *   <Note>                → "note"   (neutral, ink-muted rail)
+ *   <Note variant="warn"> → "warning" (amber rail)
+ *   <Note variant="tip">  → "tip"     (good/green rail)
+ *
+ * Rendered as a quiet editorial aside: one semantic marker and a reading rail.
+ */
+import UiIcon from "../icons/UiIcon.astro";
+interface Props {
+  variant?: "note" | "warn" | "tip";
+}
+const { variant = "note" } = Astro.props;
+const details = {
+  note: { label: "note", icon: "info" },
+  warn: { label: "warning", icon: "triangle-alert" },
+  tip: { label: "practice", icon: "lightbulb" },
+} as const;
+const detail = details[variant];
+---
+
+<aside class={`mdx-note mdx-note--${variant}`} aria-label={detail.label}>
+  <div class="mdx-note-header">
+    <span class="mdx-note-icon" aria-hidden="true"><UiIcon name={detail.icon} size={15} /></span>
+    <p class="mdx-note-label">{detail.label}</p>
+  </div>
+  <div class="mdx-note-body">
+    <slot />
+  </div>
+</aside>
+
+<style>
+  .mdx-note {
+    --note-accent: var(--ink-muted);
+    border-left: 2px solid var(--note-accent);
+    padding: 0.15rem 0 0.2rem 1rem;
+    margin-block: 2rem;
+  }
+  .mdx-note-header { display: flex; align-items: center; gap: 0.55rem; }
+  .mdx-note-icon { display: grid; place-items: center; color: var(--note-accent); }
+  .mdx-note-label {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--note-accent);
+  }
+  .mdx-note-body {
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: var(--ink-soft);
+  }
+  .mdx-note-body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .mdx-note--warn {
+    --note-accent: var(--warn);
+  }
+  .mdx-note--tip {
+    --note-accent: var(--good);
+  }
+</style>

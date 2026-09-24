@@ -1,0 +1,55 @@
+---
+/**
+ * Figure — framed image with optional caption for markdown/MDX posts.
+ *
+ *   import thumb from './thumb.svg';
+ *   <Figure src={thumb} alt="..." caption="what the reader should see" />
+ *
+ * Uses astro:assets <Image> for optimization (local imports only).
+ */
+import { Image } from "astro:assets";
+
+interface Props {
+  src: ImageMetadata;
+  alt: string;
+  caption?: string;
+}
+const { src, alt, caption } = Astro.props;
+---
+
+<figure class="mdx-figure">
+  <div class="mdx-figure-frame">
+    <Image src={src} alt={alt} loading="lazy" densities={[1, 2]} />
+  </div>
+  {
+    caption && (
+      <figcaption class="mdx-figure-caption">
+      {caption}
+      </figcaption>
+    )
+  }
+</figure>
+
+<style>
+  .mdx-figure {
+    margin-block: 2.25rem;
+  }
+  .mdx-figure-frame {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .mdx-figure-frame :global(img) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .mdx-figure-caption {
+    margin-top: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+  }
+</style>

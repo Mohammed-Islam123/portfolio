@@ -1,51 +1,9 @@
 ---
-/**
- * NavBar — gorix.zip model, with a mobile hamburger + clock on the right.
- *
- *  ── Desktop (md+) ──────────────────────────────────────────────────
- *  A detached, centered floating pill sits 12px from the top edge,
- *  rounded, hairline border, translucent surface, heavy blur.
- *  Holds the nav links (about · projects · toolkit · values · contact)
- *  + a thin separator + ThemeToggle at the right end. The clock lives
- *  in the Hero section on desktop (top-left, scrolls away with hero).
- *
- *  ── Mobile (< md) ──────────────────────────────────────────────────
- *  Following gorix.zip's mobile pattern, the nav chrome lives in the
- *  TOP-RIGHT corner as a compact cluster:
- *
- *    [clock]  [☰]      ← top-right, both glass-styled
- *
- *  The clock is always visible on mobile (it's "system info" — time,
- *  timezone) so the user doesn't lose it when scrolling past the hero.
- *  Tapping the hamburger opens a compact vertical dropdown panel
- *  (right-aligned so it doesn't overflow the viewport) with the nav
- *  links + a theme toggle row at the bottom.
- *
- *  Behaviors:
- *    • tap hamburger → toggle open/closed
- *    • tap a nav link → navigate + close
- *    • tap outside → close
- *    • Escape → close
- *    • resize to desktop → close (avoid stale state)
- *    • hamburger icon animates to X when open
- *
- *  ── Loader gate ────────────────────────────────────────────────────
- *  Both desktop pill and mobile hamburger are HIDDEN during loading
- *  (gated on the `loader:dismiss` event, with a 2.5s safety timeout).
- *  The loading screen shows only the background, the clock, and the
- *  terminal command — no nav chrome until the loader lifts. When
- *  revealed, the nav fades + drops in.
- *
- *  Active-section highlighting uses a flicker-free scrollspy (stable
- *  target-line method — see the script below).
- *
- *  Web Component lifecycle: connectedCallback re-runs after every
- *  ClientRouter body swap, re-binding scrollspy to the new page's
- *  sections and the clock to the mobile cluster.
- */
+/** Home navigation with scrollspy and a mobile menu. */
 import { navItems } from "../config/nav";
 import { siteConfig } from "../config/site";
 import ThemeToggle from "./ThemeToggle.astro";
+import UiIcon from "./icons/UiIcon.astro";
 ---
 
 <nav-bar
@@ -53,12 +11,10 @@ import ThemeToggle from "./ThemeToggle.astro";
   data-timezone={siteConfig.timezone}
 >
   <header class="nav-header fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 pointer-events-none">
-    <!-- ── desktop pill (md+) ──────────────────────────────────────
-         centered floating pill with nav links + theme toggle.
-         hidden on mobile. -->
     <nav
       aria-label="primary"
-      class="nav-desktop pointer-events-auto hidden md:flex max-w-[calc(100vw-1.5rem)] items-center gap-0.5 overflow-x-auto rounded-[10px] border border-[var(--line-soft)] p-1 backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      data-lenis-prevent
+      class="nav-desktop nav-haze--elevated pointer-events-auto hidden md:flex max-w-[calc(100vw-10rem)] items-center gap-0.5 overflow-x-auto rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] p-1 backdrop-blur-[12px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {
         navItems.map((item) => (
@@ -71,42 +27,44 @@ import ThemeToggle from "./ThemeToggle.astro";
           </a>
         ))
       }
-      <!-- thin separator + theme toggle at the pill's right end -->
       <span aria-hidden="true" class="mx-0.5 h-5 w-px shrink-0 bg-[var(--line)]"></span>
+      <a
+        href="/blog/"
+        data-blog-link
+        class="nav-blog-link shrink-0 inline-flex items-center gap-2 rounded-[7px] px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-[var(--ink-muted)] transition-[color,background-color,border-color] [transition-duration:var(--transition-fast)]"
+      >
+        <UiIcon name="book-open" size={14} />
+        <span>Blog</span>
+      </a>
       <div class="shrink-0 px-0.5">
         <ThemeToggle />
       </div>
     </nav>
 
-    <!-- ── mobile cluster (visible < md only) ──────────────────────
-         A compact cluster pinned to the TOP-RIGHT corner: clock +
-         hamburger. The clock is always visible on mobile (gorix.zip
-         shows it top-right on mobile so it doesn't scroll away with
-         the hero). Uses `ml-auto` to push the cluster to the right
-         edge of the pointer-events-none header wrapper. -->
     <div class="pointer-events-auto ml-auto flex items-center gap-2 md:hidden">
-      <!-- clock — compact, glass-styled, always visible on mobile.
-           Shows HH:MM:SS + tz label; updated every second by the
-           script (paused when the tab is hidden). Initial placeholder
-           "--:--:--" matches the static HTML. -->
+      <a
+        href="/blog/"
+        data-blog-link
+        class="nav-blog-mobile nav-haze--elevated flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] text-[var(--ink-muted)] backdrop-blur-[12px] transition-[color,background-color,border-color] [transition-duration:var(--transition-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+        aria-label="Open blog"
+      >
+        <UiIcon name="book-open" size={16} />
+      </a>
       <div
         aria-hidden="true"
-        class="flex select-none items-center gap-1.5 rounded-[10px] border border-[var(--line-soft)] px-2.5 py-2 font-mono text-[10px] tracking-[0.04em] text-[var(--ink-dim)] backdrop-blur-xl"
+        class="nav-mobile-clock nav-haze--elevated flex select-none items-center gap-1.5 rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] px-2.5 py-2 font-mono text-xs tracking-[0.04em] text-[var(--ink-dim)] backdrop-blur-[12px]"
       >
         <span class="nav-clock tabular-nums text-[var(--ink-muted)]">--:--:--</span>
         <span class="text-[var(--ink-faint)]">{siteConfig.tzLabel}</span>
       </div>
 
-      <!-- hamburger button — glass-styled, morphs to X when open -->
       <button
         type="button"
-        class="nav-burger flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--line-soft)] backdrop-blur-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60 transition-[border-color,background-color] [transition-duration:var(--transition-fast)]"
+        class="nav-burger nav-haze--elevated flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] backdrop-blur-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60 transition-[border-color,background-color] [transition-duration:var(--transition-fast)]"
         aria-label="Open menu"
         aria-expanded="false"
         aria-controls="mobile-nav"
       >
-        <!-- hamburger icon — 3 lines that morph into an X when open.
-             Pure CSS: three spans + transforms on the open state. -->
         <span class="relative block h-3.5 w-4">
           <span class="burger-line burger-line-top absolute left-0 top-0 h-px w-full bg-[var(--ink)] transition-transform [transition-duration:200ms] [transition-timing-function:var(--ease)]"></span>
           <span class="burger-line burger-line-mid absolute left-0 top-[7px] h-px w-full bg-[var(--ink)] transition-opacity [transition-duration:150ms]"></span>
@@ -116,15 +74,10 @@ import ThemeToggle from "./ThemeToggle.astro";
     </div>
   </header>
 
-  <!-- ── mobile dropdown panel ──────────────────────────────────────
-       Right-aligned (anchored to the hamburger's right edge), glass-
-       styled like the desktop pill. Slides + fades in from the top
-       when open (per-item stagger). Closes on nav-click, outside-click,
-       or Escape. Width is capped so it doesn't span the full viewport. -->
   <nav
     id="mobile-nav"
     aria-label="mobile primary"
-    class="nav-mobile-panel fixed right-3 top-14 z-50 w-[min(240px,calc(100vw-1.5rem))] overflow-hidden rounded-[12px] border border-[var(--line-soft)] p-1.5 backdrop-blur-xl md:hidden shadow-[0_12px_40px_-12px_rgba(0,0,0,0.5)]"
+    class="nav-mobile-panel nav-haze--elevated fixed right-3 top-14 z-50 w-[min(240px,calc(100vw-1.5rem))] overflow-hidden rounded-[12px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] p-1.5 backdrop-blur-[12px] md:hidden"
     hidden
   >
     {
@@ -136,7 +89,6 @@ import ThemeToggle from "./ThemeToggle.astro";
           style={`--item-delay: ${i * 35}ms;`}
         >
           <span class="tracking-[0.04em]">{item.label}</span>
-          <!-- active indicator — small dot on the right -->
           <span
             aria-hidden="true"
             class="nav-active-dot h-1.5 w-1.5 rounded-full bg-[var(--signal)]"
@@ -145,18 +97,15 @@ import ThemeToggle from "./ThemeToggle.astro";
         </a>
       ))
     }
-    <!-- separator + theme toggle at the bottom -->
     <div aria-hidden="true" class="my-1 mx-2 h-px bg-[var(--line)]"></div>
     <div class="flex items-center justify-between px-4 py-2.5">
-      <span class="font-mono text-[11px] tracking-[0.08em] text-[var(--ink-dim)] uppercase">
+      <span class="font-mono text-xs tracking-[0.08em] text-[var(--ink-dim)] uppercase">
         theme
       </span>
       <ThemeToggle />
     </div>
   </nav>
 
-  <!-- backdrop — transparent click-catcher that closes the menu on
-       outside tap. Sits behind the dropdown but above page content. -->
   <button
     type="button"
     aria-hidden="true"
@@ -207,14 +156,13 @@ import ThemeToggle from "./ThemeToggle.astro";
 
       const header = this.querySelector<HTMLElement>(".nav-header");
       const burger = this.querySelector<HTMLButtonElement>(".nav-burger");
-      const panel = this.querySelector<HTMLElement>(".nav-mobile-panel");
       const backdrop = this.querySelector<HTMLButtonElement>(".nav-backdrop");
       const clock = this.querySelector<HTMLElement>(".nav-clock");
       const links = Array.from(this.querySelectorAll<HTMLAnchorElement>("[data-nav-link]"));
+      const blogLinks = Array.from(this.querySelectorAll<HTMLAnchorElement>("[data-blog-link]"));
 
-      // ── loader gate: hidden until `loader:dismiss`, then nav-drop ──
-      // safety timeout mirrors the old useLoaderDismissed hook — never
-      // leave the nav permanently hidden.
+      // The root state closes the event-listener race on refreshes: a
+      // component can connect after the loader has already dismissed.
       const reveal = () => {
         if (this.revealed || !header) return;
         this.revealed = true;
@@ -222,12 +170,13 @@ import ThemeToggle from "./ThemeToggle.astro";
         header.style.pointerEvents = "";
         header.classList.add("nav-revealed");
       };
-      window.addEventListener("loader:dismiss", reveal, { once: true });
-      const safety = setTimeout(reveal, 2500);
       if (header) {
         header.style.opacity = "0";
         header.style.pointerEvents = "none";
       }
+      if (document.documentElement.dataset.loaderState !== "loading") reveal();
+      else window.addEventListener("loader:dismiss", reveal, { once: true });
+      const safety = setTimeout(reveal, 6000);
       this.cleanupFns.push(() => {
         window.removeEventListener("loader:dismiss", reveal);
         clearTimeout(safety);
@@ -294,6 +243,10 @@ import ThemeToggle from "./ThemeToggle.astro";
           playSound("click");
           this.setMobileOpen(false);
         });
+      }
+      for (const a of blogLinks) {
+        a.addEventListener("mouseenter", () => playSound("hover"));
+        a.addEventListener("click", () => playSound("click"));
       }
 
       // ── mobile clock ──────────────────────────────────────────────
@@ -400,9 +353,13 @@ import ThemeToggle from "./ThemeToggle.astro";
     }
   }
 
-  /* ── desktop pill surface ─────────────────────────────────────── */
-  .nav-desktop {
-    background-color: var(--nav-glass-bg);
+  .nav-blog-link:hover,
+  .nav-blog-mobile:hover {
+    border-color: var(--line-strong);
+    color: var(--ink);
+  }
+  .nav-blog-link:hover {
+    background-color: var(--surface-2);
   }
 
   /* ── nav link states (active driven by scrollspy's .is-active) ── */
@@ -430,7 +387,6 @@ import ThemeToggle from "./ThemeToggle.astro";
   }
   .nav-mobile-panel:not([hidden]) {
     animation: mobile-nav-in 240ms var(--ease) both;
-    background-color: var(--nav-glass-bg-strong);
   }
   @keyframes mobile-nav-item-in {
     from {
@@ -467,9 +423,6 @@ import ThemeToggle from "./ThemeToggle.astro";
   }
 
   /* ── hamburger surface + morph-to-X ───────────────────────────── */
-  .nav-burger {
-    background-color: var(--nav-glass-bg);
-  }
   .nav-burger.is-open {
     border-color: var(--line-strong);
   }
@@ -484,7 +437,7 @@ import ThemeToggle from "./ThemeToggle.astro";
   }
 
   /* lock page scroll when mobile nav is open — same !important
-     pattern as the loader scroll lock (Lenis-safe). */
+     pattern as the loader scroll lock. */
   :global(html.mobile-nav-open) {
     overflow: hidden !important;
   }

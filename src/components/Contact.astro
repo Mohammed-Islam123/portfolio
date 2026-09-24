@@ -42,11 +42,11 @@ const buildYear = new Date().getFullYear();
     <Reveal delay={80}>
       <div class="mt-10 flex flex-col items-center text-center">
         <p
-          class="font-serif font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--ink)]"
+          class="font-display font-semibold leading-[1.05] tracking-[-0.035em] text-[var(--ink)]"
           style="font-size: clamp(1.6rem, 5vw, 3.25rem);"
         >
           if you've made it this far,
-          <span class="italic font-light text-[var(--ink-soft)]">say hi</span>.
+          <span class="font-light text-[var(--ink-soft)]">say hi</span>.
         </p>
 
         <!-- social icon row — centered, the call to action itself -->
@@ -81,13 +81,11 @@ const buildYear = new Date().getFullYear();
   <!-- ── footer bar ──────────────────────────────────────────── -->
   <div class="relative border-t border-[var(--line-soft)]">
     <div
-      class="wrap flex flex-wrap items-center justify-between gap-3 py-4 font-mono text-[11px] text-[var(--ink-dim)]"
+      class="wrap flex flex-wrap items-center justify-between gap-3 py-4 font-mono text-xs text-[var(--ink-dim)]"
     >
       <div class="flex items-center gap-2">
         <span class="text-[var(--ink-muted)]">©</span>
         <span><span data-year>{buildYear}</span> {siteConfig.fullName}</span>
-        <span class="hidden text-[var(--line)] md:inline">/</span>
-        <span class="hidden md:inline">no tracking · built with astro</span>
       </div>
       <div class="flex items-center gap-3">
         <sound-toggle>

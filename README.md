@@ -1,29 +1,31 @@
 # Mohamed Islam — Backend Engineer Portfolio
 
-Personal portfolio: single-page landing (`/`) + five project case pages
-(`/projects/[slug]`) + custom 404. Ported from the Next.js version
-(`../portv11`) to Astro 7 with zero framework JS — all interactivity is
-vanilla Web Components + a few global scripts.
+Personal portfolio: single-page landing (`/`) + blog (`/blog`, `/blog/[slug]`)
++ custom 404. Ported
+from the Next.js version (`../portv11`) to Astro 7 with zero framework JS —
+all interactivity is vanilla Web Components + a few global scripts.
 
 ## Stack
 
 - **Astro 7** (static output) + **Tailwind CSS v4** (CSS-first config in
   `src/styles/global.css`)
-- **Lenis** smooth scroll · **simple-icons** brand SVGs (rendered at
-  build time) · Geist Sans/Mono via fontsource
-- No UI framework — ~84 KB of JS shipped total
+- **Bricolage Grotesque** (display) + **Spline Sans Mono** (body/UI/code)
+  via fontsource · **simple-icons** brand SVGs (rendered at build time)
+- No UI framework — ~72 KB of JS shipped total
+- Native smooth scroll (no Lenis); `astro:transitions` ClientRouter for SPA nav
 
 ## Structure
 
 ```text
 src/
 ├── config/        site identity, nav, projects, toolkit, values (all copy lives here)
-├── lib/           scrambler engine, syntax highlighter, WebAudio sound engine
-├── scripts/       global singletons: lenis, custom cursor, scroll reveal, sound
+├── content/       blog content collection (`src/content/blog/`, schema in `src/content.config.ts`)
+├── lib/           icons, scrambler engine, syntax highlighter, blog helpers, WebAudio sound
+├── scripts/       global singletons: smooth scroll, custom cursor, scroll reveal, sound
 ├── components/    one .astro per component; interactive ones are Web Components
-│   └── primitives/, icons/
+│   └── primitives/, icons/, mdx/
 ├── layouts/Layout.astro
-└── pages/         index, projects/[slug], 404
+└── pages/         index, blog (index + [slug]), rss.xml, 404
 ```
 
 ## Commands
@@ -38,11 +40,11 @@ src/
 
 ## Notes
 
-- All content is config-driven — edit `src/config/*`, never the
-  components.
-- Design system ("Engineered Calm", warm monochrome + amber signal)
-  lives entirely in `src/styles/global.css` tokens.
-- Placeholders to replace before launch: portrait (pravatar), social
-  URLs, and `public/cv-mohamed-islam.pdf` for the CV button.
-- Future blog: add a `src/content/blog/` collection; the prose styles
-  (`.prose-measure`, `.drop-cap`, `.grid-bg`) are already in place.
+- All content is config-driven — edit `src/config/*`, never the components.
+- Design system ("Engineered Calm", warm monochrome + amber signal) lives
+  entirely in `src/styles/global.css` tokens. No sans-serif — `--font-sans`
+  aliases the mono.
+- Placeholders to replace before launch: portrait (pravatar), social URLs,
+  project links/metrics, and `public/cv-mohamed-islam.pdf` for the CV button.
+- Blog posts live in `src/content/blog/`; draft posts (`draft: true`) are
+  excluded from production builds.

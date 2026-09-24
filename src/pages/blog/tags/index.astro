@@ -1,0 +1,35 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import BlogBar from "../../../components/BlogBar.astro";
+import Reveal from "../../../components/primitives/Reveal.astro";
+import { collectTags, getPosts } from "../../../lib/blog";
+
+const posts = await getPosts();
+const tags = collectTags(posts);
+---
+
+<Layout title="Tags · Blog · Mohamed Islam" description="Browse blog posts by topic.">
+  <BlogBar />
+  <main class="tag-page">
+    <div class="wrap tag-page__inner">
+      <Reveal delay={70}><h1>Browse by tag.</h1></Reveal>
+      <Reveal delay={120}><p>{tags.length} topics across {posts.length} posts.</p></Reveal>
+      <Reveal delay={170}>
+        <ul class="tag-list">
+          {tags.map((tag) => <li><a href={`/blog/tags/${tag.slug}/`}><span>{tag.name}</span><small>{tag.count} {tag.count === 1 ? "post" : "posts"}</small></a></li>)}
+        </ul>
+      </Reveal>
+    </div>
+  </main>
+</Layout>
+
+<style>
+  .tag-page { min-height: 100svh; padding: calc(var(--nav-h) + 3rem) 0 4rem; }
+  .tag-page__inner { max-width: 60rem; }
+  h1 { margin: 0.7rem 0 0; font-family: var(--font-display); font-size: clamp(2.5rem, 7vw, 5rem); font-weight: 650; letter-spacing: -0.05em; line-height: 1; color: var(--ink); }
+  p { margin: 1rem 0 0; color: var(--ink-muted); }
+  .tag-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 0.7rem; margin: 2.5rem 0 0; padding: 0; list-style: none; }
+  .tag-list a { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 3.25rem; padding: 0.75rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); text-decoration: none; transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast); }
+  .tag-list a:hover { border-color: var(--ink-muted); background: var(--surface-2); transform: translateY(-1px); }
+  .tag-list small { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--ink-dim); }
+</style>

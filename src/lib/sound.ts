@@ -47,6 +47,10 @@ class SoundEngine {
   play(name: SoundName) {
     if (!this.enabled || !this.ctx) return;
     const ctx = this.ctx;
+    if (ctx.state === "suspended") {
+      void ctx.resume().then(() => this.play(name));
+      return;
+    }
     const now = ctx.currentTime;
 
     const osc = ctx.createOscillator();
