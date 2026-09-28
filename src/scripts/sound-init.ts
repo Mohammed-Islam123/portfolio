@@ -6,9 +6,8 @@
  *
  *  • reads capability + stored preference, enables the SoundEngine
  *  • arms the AudioContext on the first pointer/keydown (autoplay policy)
- *  • `toggleSound()` flips state, persists to localStorage, and
- *    broadcasts `mi-sound-change` so every SoundToggle LED in the page
- *    stays in sync
+ *  • `toggleSound()` and `setSoundVolume()` persist the visitor's settings
+ *    and broadcast `mi-sound-change` so nav and footer controls stay in sync
  *
  * Components play sounds through `playSound()` — a thin wrapper that is
  * a no-op when sound is off (the engine no-ops internally anyway, but
@@ -22,25 +21,33 @@
 import { sound, isSoundCapable } from "../lib/sound";
 
 const STORAGE_KEY = "mi-sound";
-// dispatched whenever sound is toggled — so the footer LED and any other
-// consumer stay in sync within the tab.
+const VOLUME_STORAGE_KEY = "mi-sound-volume";
+const DEFAULT_VOLUME = 75;
+// Dispatched for mute and volume changes so every control stays in sync.
 export const SOUND_SYNC_EVENT = "mi-sound-change";
 
 let enabled = false;
+let volume = DEFAULT_VOLUME;
 let initialized = false;
 
 function readState() {
   const can = isSoundCapable();
-  let want = false;
+  let want = can;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     // default ON unless the user explicitly opted out ("off")
     want = can && stored !== "off";
+    const savedVolume = localStorage.getItem(VOLUME_STORAGE_KEY);
+    if (savedVolume !== null) {
+      const parsed = Number(savedVolume);
+      if (Number.isFinite(parsed)) volume = Math.min(100, Math.max(0, parsed));
+    }
   } catch {
     /* ignore */
   }
-  enabled = want;
-  if (want) {
+  sound.setVolume(volume / 100);
+  enabled = want && volume > 0;
+  if (enabled) {
     // arm: sound.enable() creates/resumes the context; the resume only
     // takes effect once a gesture fires — the listeners below cover that.
     sound.enable();
@@ -74,7 +81,21 @@ export function isSoundCapableNow(): boolean {
   return isSoundCapable();
 }
 
+export function getSoundVolume(): number {
+  return volume;
+}
+
+function broadcast() {
+  window.dispatchEvent(new CustomEvent<boolean>(SOUND_SYNC_EVENT, { detail: enabled }));
+}
+
 export function toggleSound(): void {
+  if (!isSoundCapable()) return;
+  if (!enabled && volume === 0) {
+    volume = DEFAULT_VOLUME;
+    sound.setVolume(volume / 100);
+    try { localStorage.setItem(VOLUME_STORAGE_KEY, String(volume)); } catch { /* ignore */ }
+  }
   enabled = !enabled;
 
   if (enabled) {
@@ -90,7 +111,21 @@ export function toggleSound(): void {
   }
 
   // broadcast to SoundToggle UIs in this tab
-  window.dispatchEvent(new CustomEvent<boolean>(SOUND_SYNC_EVENT, { detail: enabled }));
+  broadcast();
+}
+
+export function setSoundVolume(value: number): void {
+  if (!isSoundCapable() || !Number.isFinite(value)) return;
+  volume = Math.min(100, Math.max(0, Math.round(value)));
+  sound.setVolume(volume / 100);
+  enabled = volume > 0;
+  if (enabled) sound.enable();
+  else sound.disable();
+  try {
+    localStorage.setItem(VOLUME_STORAGE_KEY, String(volume));
+    localStorage.setItem(STORAGE_KEY, enabled ? "on" : "off");
+  } catch { /* ignore */ }
+  broadcast();
 }
 
 export function playSound(name: Parameters<typeof sound.play>[0]): void {

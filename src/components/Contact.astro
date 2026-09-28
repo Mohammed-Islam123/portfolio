@@ -122,7 +122,12 @@ const buildYear = new Date().getFullYear();
   } from "../scripts/sound-init";
 
   class SoundToggleEl extends HTMLElement {
+    private events: AbortController | null = null;
+
     connectedCallback() {
+      this.events?.abort();
+      this.events = new AbortController();
+      const options = { signal: this.events.signal };
       const disabled = this.querySelector<HTMLElement>(".sound-off");
       const btn = this.querySelector<HTMLButtonElement>(".st-btn");
       const led = this.querySelector<HTMLElement>(".st-led");
@@ -152,18 +157,23 @@ const buildYear = new Date().getFullYear();
 
       btn.addEventListener("click", () => {
         toggleSound();
-      });
+      }, options);
       // stay in sync with other toggles in the tab
-      window.addEventListener(SOUND_SYNC_EVENT, render);
+      window.addEventListener(SOUND_SYNC_EVENT, render, options);
 
       // social buttons — hover/click sounds (delegated within the footer)
       const footer = this.closest("footer");
       footer?.querySelectorAll("[data-sound-hover]").forEach((el) =>
-        el.addEventListener("mouseenter", () => playSound("hover")),
+        el.addEventListener("mouseenter", () => playSound("hover"), options),
       );
       footer?.querySelectorAll("[data-sound-click]").forEach((el) =>
-        el.addEventListener("click", () => playSound("click")),
+        el.addEventListener("click", () => playSound("click"), options),
       );
+    }
+
+    disconnectedCallback() {
+      this.events?.abort();
+      this.events = null;
     }
   }
 

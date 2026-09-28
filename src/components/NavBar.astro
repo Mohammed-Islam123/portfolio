@@ -3,6 +3,7 @@
 import { navItems } from "../config/nav";
 import { siteConfig } from "../config/site";
 import ThemeToggle from "./ThemeToggle.astro";
+import SoundVolume from "./SoundVolume.astro";
 import UiIcon from "./icons/UiIcon.astro";
 ---
 
@@ -14,7 +15,7 @@ import UiIcon from "./icons/UiIcon.astro";
     <nav
       aria-label="primary"
       data-lenis-prevent
-      class="nav-desktop nav-haze--elevated pointer-events-auto hidden md:flex max-w-[calc(100vw-10rem)] items-center gap-0.5 overflow-x-auto rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] p-1 backdrop-blur-[12px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      class="nav-desktop nav-haze nav-haze--elevated pointer-events-auto hidden md:flex max-w-[calc(100vw-10rem)] items-center gap-0.5 overflow-x-auto rounded-[10px] border border-[var(--line-soft)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {
         navItems.map((item) => (
@@ -40,8 +41,11 @@ import UiIcon from "./icons/UiIcon.astro";
         <ThemeToggle />
       </div>
     </nav>
-
+    <div class="ml-2 hidden md:block">
+      <SoundVolume instance="desktop" />
+    </div>
     <div class="pointer-events-auto ml-auto flex items-center gap-2 md:hidden">
+      <SoundVolume instance="mobile" />
       <a
         href="/blog/"
         data-blog-link
@@ -50,6 +54,7 @@ import UiIcon from "./icons/UiIcon.astro";
       >
         <UiIcon name="book-open" size={16} />
       </a>
+
       <div
         aria-hidden="true"
         class="nav-mobile-clock nav-haze--elevated flex select-none items-center gap-1.5 rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] px-2.5 py-2 font-mono text-xs tracking-[0.04em] text-[var(--ink-dim)] backdrop-blur-[12px]"
@@ -328,6 +333,13 @@ import UiIcon from "./icons/UiIcon.astro";
 </script>
 
 <style>
+  /* Reserve room for the control to open to the right on narrow desktops. */
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .nav-header {
+      padding-right: clamp(12px, calc(1024px - 100vw), 228px);
+    }
+  }
+
   /* ── loader-gated entrance ────────────────────────────────────── */
   @keyframes nav-drop {
     from {

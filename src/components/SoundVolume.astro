@@ -1,0 +1,297 @@
+---
+/** Shared site sound-effects control for desktop and mobile navigation. */
+import UiIcon from "./icons/UiIcon.astro";
+
+interface Props { instance: "desktop" | "mobile"; }
+const { instance } = Astro.props;
+---
+
+<sound-volume class="sv-root pointer-events-auto relative block shrink-0" data-open="false" data-on="false">
+  <div class="sv-shell nav-haze nav-haze--elevated">
+    <button
+      type="button"
+      class="sv-button"
+      aria-label="Turn site sound effects on"
+      aria-pressed="false"
+      aria-expanded="false"
+      aria-controls={`sound-volume-panel-${instance}`}
+    >
+      <UiIcon name="volume-2" size={17} class="sv-icon-on" />
+      <UiIcon name="volume-x" size={17} class="sv-icon-off" />
+    </button>
+
+    <div id={`sound-volume-panel-${instance}`} class="sv-controls" role="group" aria-label="Site sound effects volume">
+      <input
+        class="sv-range"
+        type="range"
+        min="0"
+        max="100"
+        step="1"
+        value="75"
+        aria-label="Site sound effects volume"
+      />
+      <output class="sv-value">75%</output>
+    </div>
+  </div>
+</sound-volume>
+
+<script>
+  import {
+    getSoundVolume,
+    isSoundCapableNow,
+    isSoundOn,
+    playSound,
+    setSoundVolume,
+    SOUND_SYNC_EVENT,
+    toggleSound,
+  } from "../scripts/sound-init";
+
+  class SoundVolumeEl extends HTMLElement {
+    private cleanupFns: (() => void)[] = [];
+
+    connectedCallback() {
+      const button = this.querySelector<HTMLButtonElement>(".sv-button");
+      const slider = this.querySelector<HTMLInputElement>(".sv-range");
+      const output = this.querySelector<HTMLOutputElement>(".sv-value");
+      const controls = this.querySelector<HTMLElement>(".sv-controls");
+      if (!button || !slider || !output || !controls) return;
+      let pointerFocused = false;
+
+      const render = () => {
+        const on = isSoundOn();
+        const level = getSoundVolume();
+        const capable = isSoundCapableNow();
+        this.dataset.on = String(on);
+        button.disabled = !capable;
+        slider.disabled = !capable;
+        button.setAttribute("aria-pressed", String(on));
+        button.setAttribute("aria-label", on ? "Mute site sound effects" : "Turn site sound effects on");
+        slider.value = String(level);
+        slider.style.setProperty("--sv-level", `${level}%`);
+        output.value = `${level}%`;
+      };
+      const setOpen = (open: boolean) => {
+        this.dataset.open = String(open);
+        button.setAttribute("aria-expanded", String(open));
+      };
+      const onEnter = (event: PointerEvent) => {
+        if (event.pointerType === "mouse") setOpen(true);
+      };
+      const onLeave = (event: PointerEvent) => {
+        if (event.pointerType !== "mouse") return;
+        if (pointerFocused) {
+          pointerFocused = false;
+          if (this.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+        }
+        if (!this.contains(document.activeElement)) setOpen(false);
+      };
+      const onPointerDown = () => { pointerFocused = true; };
+      const onFocusIn = () => setOpen(true);
+      const onFocusOut = (event: FocusEvent) => {
+        if (!this.contains(event.relatedTarget as Node | null) && !this.matches(":hover")) {
+          setOpen(false);
+        }
+      };
+      const onOutside = (event: PointerEvent) => {
+        if (this.contains(event.target as Node)) return;
+        pointerFocused = false;
+        setOpen(false);
+        if (this.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+      };
+      const onKey = (event: KeyboardEvent) => {
+        if (this.contains(event.target as Node)) pointerFocused = false;
+        if (event.key !== "Escape" || this.dataset.open !== "true") return;
+        setOpen(false);
+        if (this.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+        event.stopPropagation();
+      };
+      const onClick = () => {
+        toggleSound();
+        setOpen(true);
+      };
+      const onInput = () => setSoundVolume(slider.valueAsNumber);
+      const onChange = () => {
+        if (isSoundOn()) playSound("toggle");
+      };
+
+      this.addEventListener("pointerenter", onEnter);
+      this.addEventListener("pointerleave", onLeave);
+      this.addEventListener("pointerdown", onPointerDown);
+      this.addEventListener("focusin", onFocusIn);
+      this.addEventListener("focusout", onFocusOut);
+      document.addEventListener("pointerdown", onOutside);
+      document.addEventListener("keydown", onKey);
+      button.addEventListener("click", onClick);
+      slider.addEventListener("input", onInput);
+      slider.addEventListener("change", onChange);
+      window.addEventListener(SOUND_SYNC_EVENT, render);
+      render();
+
+      this.cleanupFns.push(() => {
+        this.removeEventListener("pointerenter", onEnter);
+        this.removeEventListener("pointerleave", onLeave);
+        this.removeEventListener("pointerdown", onPointerDown);
+        this.removeEventListener("focusin", onFocusIn);
+        this.removeEventListener("focusout", onFocusOut);
+        document.removeEventListener("pointerdown", onOutside);
+        document.removeEventListener("keydown", onKey);
+        button.removeEventListener("click", onClick);
+        slider.removeEventListener("input", onInput);
+        slider.removeEventListener("change", onChange);
+        window.removeEventListener(SOUND_SYNC_EVENT, render);
+      });
+    }
+
+    disconnectedCallback() {
+      this.cleanupFns.forEach((cleanup) => cleanup());
+      this.cleanupFns = [];
+    }
+  }
+
+  if (!customElements.get("sound-volume")) {
+    customElements.define("sound-volume", SoundVolumeEl);
+  }
+</script>
+
+<style>
+  .sv-root {
+    --sv-size: 46px;
+    --sv-button-size: 36px;
+    width: var(--sv-size);
+    height: var(--sv-size);
+    z-index: 1;
+  }
+  .sv-root[data-open="true"] { z-index: 3; }
+  .sv-shell {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    box-sizing: border-box;
+    width: var(--sv-size);
+    height: var(--sv-size);
+    padding: 4px;
+    overflow: hidden;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    transition: width 340ms var(--ease), border-color var(--transition-fast),
+      box-shadow var(--transition);
+  }
+  .sv-root[data-open="true"] .sv-shell {
+    width: 216px;
+    border-color: var(--line-strong);
+    box-shadow: var(--glass-inset), 0 14px 32px -18px var(--ink-dim);
+  }
+  .sv-button {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--sv-button-size);
+    height: var(--sv-button-size);
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: color var(--transition-fast), background-color var(--transition-fast);
+  }
+  .sv-button:hover, .sv-root[data-open="true"] .sv-button {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  .sv-button:focus-visible { outline: 2px solid var(--signal); outline-offset: -3px; }
+  .sv-button:disabled { cursor: not-allowed; opacity: 0.5; }
+  .sv-root[data-on="true"] :global(.sv-icon-off),
+  .sv-root[data-on="false"] :global(.sv-icon-on) { display: none; }
+  .sv-controls {
+    position: absolute;
+    inset: 0 13px 0 48px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateX(-9px);
+    transition: opacity 170ms var(--ease), transform 280ms var(--ease), visibility 170ms;
+  }
+  .sv-root[data-open="true"] .sv-controls {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+  .sv-value {
+    flex: none;
+    width: 34px;
+    color: var(--ink);
+    font: 500 10px/1 var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .sv-range {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  .sv-range:focus-visible { outline: 2px solid var(--signal); outline-offset: 4px; border-radius: 6px; }
+  .sv-range::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--ink) var(--sv-level), var(--line-strong) var(--sv-level));
+  }
+  .sv-range::-moz-range-track {
+    height: 4px;
+    border-radius: 999px;
+    background: linear-gradient(to right, var(--ink) var(--sv-level), var(--line-strong) var(--sv-level));
+  }
+  .sv-range::-webkit-slider-thumb {
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border: 3px solid var(--nav-haze-bg);
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 0 1px var(--ink-muted);
+    appearance: none;
+    -webkit-appearance: none;
+    transition: transform var(--transition-fast);
+  }
+  .sv-range::-moz-range-thumb {
+    width: 9px;
+    height: 9px;
+    border: 3px solid var(--nav-haze-bg);
+    border-radius: 50%;
+    background: var(--ink);
+    box-shadow: 0 0 0 1px var(--ink-muted);
+    transition: transform var(--transition-fast);
+  }
+  .sv-range:hover::-webkit-slider-thumb { transform: scale(1.15); }
+  .sv-range:hover::-moz-range-thumb { transform: scale(1.15); }
+  @media (max-width: 767px) {
+    .sv-root { --sv-size: 36px; --sv-button-size: 34px; }
+    .sv-shell { padding: 0; }
+    .sv-root[data-open="true"] .sv-shell { width: 190px; }
+    .sv-controls { right: 10px; left: 40px; gap: 6px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sv-button,
+    .sv-shell,
+    .sv-controls,
+    .sv-range::-webkit-slider-thumb,
+    .sv-range::-moz-range-thumb { transition: none; }
+    .sv-controls { transform: none; }
+  }
+</style>

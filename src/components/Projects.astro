@@ -353,7 +353,6 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
                     <span class="font-mono text-xs tabular-nums text-[var(--ink-dim)]">{pad(i + 1)}</span>
                     <h3 class="font-display text-lg font-bold tracking-[-0.02em] text-[var(--ink)]">{p.title}</h3>
                     <span class="ml-auto font-mono text-xs tabular-nums text-[var(--ink-dim)]">{p.year}</span>
-                    <span class="basis-full font-mono text-[0.68rem] tracking-[0.08em] text-[var(--ink-dim)] uppercase">{p.category}</span>
                   </div>
                   <div id={`project-row-description-${i}`} data-description-viewport class="project-description-viewport mt-2">
                     <p data-description class="max-w-4xl font-sans text-sm leading-[1.55] text-[var(--ink-muted)]">{p.description}</p>

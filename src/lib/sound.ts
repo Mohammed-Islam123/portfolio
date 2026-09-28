@@ -1,6 +1,6 @@
 /**
  * SOUND ENGINE — tiny WebAudio synth, no audio files.
- * Opt-in via the footer toggle. Off on reduced-motion only.
+ * Controlled by the shared nav/footer sound preference. Off on reduced motion.
  *
  * Sounds are programmable envelopes around simple oscillators —
  * soft ticks, not arcade beeps. Designed to be felt, not heard.
@@ -18,7 +18,20 @@ type SoundName = "hover" | "click" | "toggle" | "section";
 
 class SoundEngine {
   private ctx: AudioContext | null = null;
+  private master: GainNode | null = null;
   private enabled = false;
+  private volume = 1;
+
+  setVolume(value: number) {
+    this.volume = Math.min(1, Math.max(0, value));
+    if (this.master && this.ctx) {
+      this.master.gain.setTargetAtTime(
+        this.enabled ? this.volume * 1.5 : 0,
+        this.ctx.currentTime,
+        0.015,
+      );
+    }
+  }
 
   /** must be called from a user gesture (click) to satisfy autoplay policy */
   enable() {
@@ -30,13 +43,18 @@ class SoundEngine {
           .webkitAudioContext;
       if (!AC) return;
       this.ctx = new AC();
+      this.master = this.ctx.createGain();
+      this.master.gain.value = 0;
+      this.master.connect(this.ctx.destination);
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
     this.enabled = true;
+    this.setVolume(this.volume);
   }
 
   disable() {
     this.enabled = false;
+    this.setVolume(this.volume);
   }
 
   get isEnabled() {
@@ -56,7 +74,7 @@ class SoundEngine {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(this.master ?? ctx.destination);
 
     switch (name) {
       case "hover": {
@@ -113,7 +131,7 @@ class SoundEngine {
         ng.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
         noise.connect(filter);
         filter.connect(ng);
-        ng.connect(ctx.destination);
+        ng.connect(this.master ?? ctx.destination);
         noise.start(now);
         noise.stop(now + 0.26);
         // skip the osc we created above
