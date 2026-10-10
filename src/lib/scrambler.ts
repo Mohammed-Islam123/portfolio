@@ -113,7 +113,7 @@ export class Scrambler {
     for (let i = 0; i < this.toText.length; i++) {
       // is this position settled yet?
       const revealIndex = this.revealOrder.indexOf(i);
-      if (revealIndex < revealCount) {
+      if (/\s/.test(this.toText[i]) || revealIndex < revealCount) {
         out += this.toText[i];
       } else {
         // pick a random scramble char from the right charset

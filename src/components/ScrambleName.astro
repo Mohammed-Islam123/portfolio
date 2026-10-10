@@ -18,17 +18,16 @@ import { siteConfig } from "../config/site";
   the timing matches.
 
   ── Static render ───────────────────────────────────────────────────
-  The build renders empty ("") so the name is invisible until the
-  loader dismisses — intentional: the loader hides the empty state.
+  A hidden copy reserves the final name's space throughout the scramble.
 -->
 <scramble-name
-  class="inline-block text-[var(--ink)]"
-  style="min-width: 1em;"
+  class="relative inline-block whitespace-nowrap text-[var(--ink)]"
   role="text"
   aria-label={siteConfig.name}
 >
-  <span class="sn-text"></span>
-  <noscript><span class="sn-text">{siteConfig.name}</span></noscript>
+  <span class="invisible" aria-hidden="true">{siteConfig.name}</span>
+  <span class="sn-text absolute inset-0 overflow-hidden" aria-hidden="true"></span>
+  <noscript><span class="absolute inset-0">{siteConfig.name}</span></noscript>
   <span class="sr-only sn-live" aria-live="polite"></span>
 </scramble-name>
 
@@ -54,7 +53,6 @@ import { siteConfig } from "../config/site";
 
       if (isClientNavigation) {
         textEl.textContent = FULL_NAME;
-        this.style.minWidth = "";
         liveEl.textContent = FULL_NAME;
         return;
       }
@@ -66,7 +64,6 @@ import { siteConfig } from "../config/site";
         const onDismiss = () => {
           textEl.textContent = FULL_NAME;
           textEl.style.animation = "greet-in 460ms var(--ease) both";
-          this.style.minWidth = "";
           liveEl.textContent = FULL_NAME;
         };
         if (document.documentElement.dataset.loaderState === "dismissed") onDismiss();
@@ -84,18 +81,18 @@ import { siteConfig } from "../config/site";
           textEl.textContent = t;
         },
         () => {
-          this.style.minWidth = "";
           liveEl.textContent = FULL_NAME;
         },
       );
 
       let started = false;
+      let startTimer: ReturnType<typeof setTimeout> | undefined;
       const onDismiss = () => {
         if (started) return;
         started = true;
         // 150ms delay so the loader has begun lifting before the
         // scramble starts — the handoff feels continuous.
-        setTimeout(() => {
+        startTimer = setTimeout(() => {
           scrambler.start("", FULL_NAME);
         }, 150);
       };
@@ -107,6 +104,7 @@ import { siteConfig } from "../config/site";
       this.cleanupFns.push(() => {
         window.removeEventListener("loader:dismiss", onDismiss);
         clearTimeout(safety);
+        clearTimeout(startTimer);
         scrambler.cancel();
       });
     }

@@ -136,10 +136,13 @@ const pad = (n: number) => String(n).padStart(2, "0");
               <button
                 type="button"
                 data-mvalue={i}
+                aria-expanded={i === 0 ? "true" : "false"}
+                aria-controls={`value-note-${v.index}`}
                 class="flex w-full items-baseline gap-3 py-5 text-left"
               >
                 <span
-                  class="text-lg transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-dim)]"
+                  class="text-lg text-[var(--ink-dim)]"
+                  style="transition: color var(--transition-fast);"
                   aria-hidden="true"
                 >
                   <UiIcon name={GLYPHS[v.index] ?? "circle-help"} size={18} />
@@ -152,21 +155,25 @@ const pad = (n: number) => String(n).padStart(2, "0");
                 </span>
                 {/* expand/collapse indicator */}
                 <span
-                  class="m-chev ml-auto font-mono text-xs text-[var(--ink-dim)] transition-transform [transition-duration:var(--transition-fast)]"
-                  style="transform: rotate(0deg);"
+                  class="m-chev ml-auto font-mono text-xs text-[var(--ink-dim)]"
+                  style="transform: rotate(0deg); transition: transform var(--transition-fast);"
                   aria-hidden="true"
                 >
                   <UiIcon name="chevron-right" size={12} />
                 </span>
               </button>
               <div
-                class="overflow-hidden transition-[max-height,opacity] [transition-duration:var(--transition)]"
-                style="max-height: 0px; opacity: 0;"
+                id={`value-note-${v.index}`}
+                aria-hidden={i !== 0 ? "true" : "false"}
+                class="grid"
+                style={`grid-template-rows: ${i === 0 ? "1fr" : "0fr"}; opacity: ${i === 0 ? 1 : 0}; transition: grid-template-rows var(--transition), opacity var(--transition);`}
                 data-mbody
               >
-                <p class="pb-5 pl-10 font-sans text-sm leading-[1.7] text-[var(--ink-muted)]">
-                  {v.description}
-                </p>
+                <div class="overflow-hidden">
+                  <p class="pb-5 pl-10 font-sans text-sm leading-[1.7] text-[var(--ink-muted)]">
+                    {v.description}
+                  </p>
+                </div>
               </div>
             </li>
           ))
@@ -196,6 +203,9 @@ const pad = (n: number) => String(n).padStart(2, "0");
     private cleanupFns: (() => void)[] = [];
 
     connectedCallback() {
+      const events = new AbortController();
+      const { signal } = events;
+      this.cleanupFns.push(() => events.abort());
       const values = JSON.parse(this.dataset.values ?? "[]") as {
         index: string;
         title: string;
@@ -277,20 +287,20 @@ const pad = (n: number) => String(n).padStart(2, "0");
             renderCard();
           }
           playSound("hover");
-        });
+        }, { signal });
         row.addEventListener("focus", () => {
           if (active !== i) {
             active = i;
             renderRows();
             renderCard();
           }
-        });
+        }, { signal });
         row.addEventListener("click", () => {
           active = i;
           renderRows();
           renderCard();
           playSound("click");
-        });
+        }, { signal });
       });
 
       // ── mobile accordion ─────────────────────────────────────────
@@ -301,14 +311,16 @@ const pad = (n: number) => String(n).padStart(2, "0");
       const renderMobile = () => {
         mBtns.forEach((btn, i) => {
           const isOpen = mobileExpanded === i;
+          btn.setAttribute("aria-expanded", String(isOpen));
           const glyph = btn.querySelector<HTMLElement>("span");
           if (glyph) glyph.style.color = isOpen ? "var(--ink)" : "var(--ink-dim)";
           if (mChevs[i]) {
             mChevs[i]!.style.transform = isOpen ? "rotate(90deg)" : "rotate(0deg)";
           }
           if (mBodies[i]) {
-            mBodies[i]!.style.maxHeight = isOpen ? "200px" : "0px";
+            mBodies[i]!.style.gridTemplateRows = isOpen ? "1fr" : "0fr";
             mBodies[i]!.style.opacity = isOpen ? "1" : "0";
+            mBodies[i]!.setAttribute("aria-hidden", String(!isOpen));
           }
         });
       };
@@ -317,7 +329,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
           mobileExpanded = mobileExpanded === i ? -1 : i;
           renderMobile();
           playSound("click");
-        });
+        }, { signal });
       });
 
       renderRows();

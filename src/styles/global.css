@@ -25,6 +25,10 @@
   --surface-2:   #181818;   /* chips, code blocks, hover surface            */
   --surface-3:   #1E1E1E;   /* nav pill, deepest raised                     */
 
+  /* Image captions keep their contrast in both themes. */
+  --project-cover-ink: #FFFFFF;
+  --project-cover-scrim: #0B0B0B;
+
   --ink:         #FFFFFF;   /* primary text — pure white (reference)        */
   --ink-soft:    #C9C9C6;   /* high-emphasis secondary (warm light gray)    */
   --ink-muted:   #B3B3B3;   /* secondary text, lead                         */
@@ -391,11 +395,7 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
     }
   }
 
-  /* ── toolkit cell — exact gorix.zip toolstack styling (monochrome chrome,
-     colored icon is the only exception). Implemented in plain CSS (not
-     Tailwind hover utilities) because Tailwind v4 gates hover: variants
-     behind @media (hover: hover), which gorix does NOT — gorix's scale
-     applies in all contexts. Matching gorix exactly means ungated CSS. */
+  /* Toolkit cells: touch uses explicit active state; hover is desktop-only. */
   .tk-cell {
     border: 1px solid var(--tk-border);
     background-color: var(--tk-bg);
@@ -415,7 +415,6 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
      which would keep the cell visually scaled even though `is-active` was
      removed. Relying ONLY on :hover (CSS) and .is-active (JS state) means
      the visual state is always a clean mirror of the logical state. */
-  .group\/tiles:hover .tk-cell:not(:hover),
   .group\/tiles:has(.tk-cell.is-active) .tk-cell:not(.is-active) {
     opacity: 0.4;
   }
@@ -432,7 +431,6 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
      same opacity and the same styles"). Keyboard a11y is preserved via
      the Tailwind focus-visible:ring utility on the button itself — Tab
      still shows a focus ring, just no scale-up (matching gorix). */
-  .group\/tiles:hover .tk-cell:hover,
   .tk-cell.is-active {
     opacity: 1;
     transform: scale(1.22);
@@ -444,10 +442,135 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
       0 0 0 1px var(--tk-ring-hover);
     backdrop-filter: blur(6px);
   }
+  @media (hover: hover) and (pointer: fine) {
+    .group\/tiles:hover .tk-cell:not(:hover):not(.is-active) { opacity: 0.4; }
+    .group\/tiles:hover .tk-cell:hover {
+      opacity: 1;
+      transform: scale(1.22);
+      z-index: 20;
+      border-color: var(--tk-border-hover);
+      background-color: var(--tk-bg-hover);
+      box-shadow:
+        inset 0 1px 0 0 var(--tk-inset-hover),
+        0 0 0 1px var(--tk-ring-hover);
+      backdrop-filter: blur(6px);
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .tk-cell { transition: none; }
     .group\/tiles:hover .tk-cell:hover,
     .tk-cell.is-active { transform: none; }
+  }
+
+  .contact-headline {
+    max-width: 24ch;
+    font-family: var(--font-display);
+    font-size: clamp(1.625rem, 4.5vw, 3.25rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+    color: var(--ink);
+  }
+
+  /* Contact controls keep platform color local to the outline and icon. */
+  .contact-pill {
+    border: 1px solid rgba(var(--platform-rgb), 0.45);
+    box-shadow: 0 0 20px -6px rgba(var(--platform-rgb), 0.16);
+    transition:
+      border-color var(--transition),
+      box-shadow var(--transition);
+  }
+  .contact-pill:hover {
+    border-color: rgba(var(--platform-rgb), 0.7);
+    box-shadow: 0 0 24px -6px rgba(var(--platform-rgb), 0.24);
+  }
+  .contact-action {
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+  .contact-action:active { background: var(--surface-2); }
+  .contact-toggle {
+    background: var(--surface-2);
+    color: var(--ink-muted);
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+  }
+  .contact-toggle:hover,
+  .contact-toggle[aria-expanded="true"] {
+    background: var(--surface-3);
+    color: var(--ink);
+  }
+  .contact-toggle:active { background: var(--surface-3); }
+  .contact-toggle .chevron-icon { transition: transform var(--transition-fast); }
+  .contact-dropdown {
+    box-shadow: var(--tk-panel-shadow);
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      opacity var(--transition-fast),
+      transform var(--transition-fast),
+      display var(--transition-fast) allow-discrete;
+  }
+  .contact-dropdown[hidden] {
+    display: none;
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  @starting-style {
+    .contact-dropdown {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+  }
+  .platform-option {
+    color: var(--ink-muted);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    cursor: pointer;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+  }
+  .platform-option:hover,
+  .platform-option[aria-selected="true"] {
+    background: var(--surface-2);
+    color: var(--ink);
+  }
+  .platform-option:active { background: var(--surface-3); }
+  .contact-profiles-label {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--ink-dim);
+  }
+  .contact-profile-link {
+    background: var(--bg);
+    color: var(--ink-muted);
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.5;
+    white-space: nowrap;
+    transition: background-color var(--transition-fast), color var(--transition-fast);
+  }
+  .contact-profile-link:hover,
+  .contact-profile-link:active {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  :is(.contact-action, .contact-toggle, .platform-option, .contact-profile-link):focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 3px;
+  }
+  .platform-option:focus-visible { outline-offset: -2px; }
+  @media (max-width: 24rem) {
+    .contact-action { font-size: 0.9375rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .contact-pill, .contact-toggle, .contact-toggle .chevron-icon,
+    .contact-dropdown, .platform-option, .contact-profile-link {
+      transition: none;
+    }
   }
 
   /* ── glass — frosted depth panel ─────────────────────────────────── */

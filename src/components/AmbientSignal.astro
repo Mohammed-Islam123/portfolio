@@ -40,12 +40,24 @@ const { class: className } = Astro.props;
       ).matches;
       const finePointer = window.matchMedia("(pointer: fine)").matches;
 
-      // line color adapts to theme (white on dark, dark on light)
-      const lineColor = () =>
-        getComputedStyle(document.documentElement)
-          .getPropertyValue("--field-color")
-          .trim() || "255, 255, 255";
-      let color = lineColor();
+      // Platform color management (WhatsApp emerald default)
+      const parseRgb = (str: string): [number, number, number] => {
+        const parts = str.split(",").map((s) => parseFloat(s.trim()));
+        if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+          return [parts[0], parts[1], parts[2]];
+        }
+        return [37, 211, 102];
+      };
+
+      const getActiveRgb = (): [number, number, number] => {
+        const custom = getComputedStyle(this).getPropertyValue("--platform-rgb").trim();
+        if (custom) return parseRgb(custom);
+        return [37, 211, 102];
+      };
+
+      let targetRgb = getActiveRgb();
+      let currentRgb: [number, number, number] = [...targetRgb];
+
       // alpha boost — dark-on-light reads dimmer at the same alpha, so light
       // mode multiplies line alpha to stay visible. Re-read on resize.
       const boostVal = () => {
@@ -68,9 +80,9 @@ const { class: className } = Astro.props;
       const mouse = { tx: -9999, ty: -9999, x: -9999, y: -9999 };
 
       const LINES = [
-        { y: 0.3, amp: 14, freq: 0.008, speed: 0.25, alpha: 0.32, width: 1 },
-        { y: 0.5, amp: 22, freq: 0.006, speed: 0.18, alpha: 0.22, width: 1.2 },
-        { y: 0.7, amp: 10, freq: 0.011, speed: 0.32, alpha: 0.18, width: 1 },
+        { y: 0.3, amp: 14, freq: 0.008, speed: 0.25, alpha: 0.35, width: 1 },
+        { y: 0.5, amp: 22, freq: 0.006, speed: 0.18, alpha: 0.25, width: 1.2 },
+        { y: 0.7, amp: 10, freq: 0.011, speed: 0.32, alpha: 0.20, width: 1 },
       ];
 
       const build = () => {
@@ -89,14 +101,21 @@ const { class: className } = Astro.props;
         ctx.clearRect(0, 0, w, h);
         const time = t / 1000;
 
+        // Smoothly lerp current RGB towards target platform RGB
+        currentRgb[0] += (targetRgb[0] - currentRgb[0]) * 0.08;
+        currentRgb[1] += (targetRgb[1] - currentRgb[1]) * 0.08;
+        currentRgb[2] += (targetRgb[2] - currentRgb[2]) * 0.08;
+
+        const colorStr = `${Math.round(currentRgb[0])}, ${Math.round(currentRgb[1])}, ${Math.round(currentRgb[2])}`;
+
         // smooth mouse position toward target (lerp 0.12)
         mouse.x += (mouse.tx - mouse.x) * 0.12;
         mouse.y += (mouse.ty - mouse.y) * 0.12;
         const hasMouse = mouse.tx > -9000;
 
-        // soft white bloom at cursor — adds depth + "the wire is alive" feel
+        // soft colored bloom at cursor — matches selected platform
         if (hasMouse) {
-          const bloomR = 180;
+          const bloomR = 190;
           const grad = ctx.createRadialGradient(
             mouse.x,
             mouse.y,
@@ -105,9 +124,9 @@ const { class: className } = Astro.props;
             mouse.y,
             bloomR,
           );
-          grad.addColorStop(0, `rgba(${color}, ${0.1 * boost})`);
-          grad.addColorStop(0.5, `rgba(${color}, ${0.03 * boost})`);
-          grad.addColorStop(1, `rgba(${color}, 0)`);
+          grad.addColorStop(0, `rgba(${colorStr}, ${0.07 * boost})`);
+          grad.addColorStop(0.5, `rgba(${colorStr}, ${0.02 * boost})`);
+          grad.addColorStop(1, `rgba(${colorStr}, 0)`);
           ctx.fillStyle = grad;
           ctx.fillRect(mouse.x - bloomR, mouse.y - bloomR, bloomR * 2, bloomR * 2);
         }
@@ -136,8 +155,15 @@ const { class: className } = Astro.props;
             ctx.lineTo(x, y);
           }
           // lines brighten slightly near the cursor — global alpha bump
-          const alpha = hasMouse ? line.alpha + 0.06 : line.alpha;
-          ctx.strokeStyle = `rgba(${color}, ${Math.min(alpha * boost, 0.85)})`;
+          const alpha = hasMouse ? line.alpha + 0.08 : line.alpha;
+
+          // soft outer glow stroke
+          ctx.strokeStyle = `rgba(${colorStr}, ${Math.min(alpha * boost * 0.45, 0.45)})`;
+          ctx.lineWidth = line.width * 2.4;
+          ctx.stroke();
+
+          // core crisp stroke
+          ctx.strokeStyle = `rgba(${colorStr}, ${Math.min(alpha * boost * 1.15, 0.9)})`;
           ctx.lineWidth = line.width;
           ctx.stroke();
         }
@@ -145,6 +171,7 @@ const { class: className } = Astro.props;
 
       const drawStatic = () => {
         ctx.clearRect(0, 0, w, h);
+        const colorStr = `${Math.round(targetRgb[0])}, ${Math.round(targetRgb[1])}, ${Math.round(targetRgb[2])}`;
         for (const line of LINES) {
           const baseY = h * line.y;
           ctx.beginPath();
@@ -153,7 +180,7 @@ const { class: className } = Astro.props;
             const y = baseY + Math.sin(x * line.freq) * line.amp;
             ctx.lineTo(x, y);
           }
-          ctx.strokeStyle = `rgba(${color}, ${line.alpha * 0.7 * boost})`;
+          ctx.strokeStyle = `rgba(${colorStr}, ${line.alpha * 0.8 * boost})`;
           ctx.lineWidth = line.width;
           ctx.stroke();
         }
@@ -174,11 +201,26 @@ const { class: className } = Astro.props;
       };
 
       const onResize = () => {
-        color = lineColor(); // re-read in case the theme flipped
         boost = boostVal();
         build();
         if (reduced) drawStatic();
       };
+
+      const onPlatformChange = (e: Event) => {
+        const evt = e as CustomEvent<{ rgb?: number[]; rgbStr?: string }>;
+        if (evt.detail?.rgb && Array.isArray(evt.detail.rgb) && evt.detail.rgb.length === 3) {
+          targetRgb = [evt.detail.rgb[0], evt.detail.rgb[1], evt.detail.rgb[2]];
+        } else if (evt.detail?.rgbStr) {
+          targetRgb = parseRgb(evt.detail.rgbStr);
+        }
+        if (reduced) {
+          currentRgb = [...targetRgb];
+          drawStatic();
+        }
+      };
+
+      window.addEventListener("platform:change", onPlatformChange);
+      this.cleanupFns.push(() => window.removeEventListener("platform:change", onPlatformChange));
 
       // track mouse position relative to the wrapper.
       // We listen on `window` (not the wrapper) because the wrapper has
@@ -199,6 +241,9 @@ const { class: className } = Astro.props;
       };
 
       build();
+      window.addEventListener("resize", onResize);
+      this.cleanupFns.push(() => window.removeEventListener("resize", onResize));
+
       if (reduced) {
         drawStatic();
       } else {
@@ -214,7 +259,6 @@ const { class: className } = Astro.props;
           { threshold: 0 },
         );
         io.observe(this);
-        window.addEventListener("resize", onResize);
         // only track mouse on fine-pointer devices (skip touch)
         if (finePointer) {
           window.addEventListener("mousemove", onMouseMove, { passive: true });
@@ -222,7 +266,6 @@ const { class: className } = Astro.props;
         this.cleanupFns.push(() => {
           stop();
           io.disconnect();
-          window.removeEventListener("resize", onResize);
           if (finePointer) {
             window.removeEventListener("mousemove", onMouseMove);
           }

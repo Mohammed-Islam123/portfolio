@@ -30,6 +30,7 @@
  *    • Escape key -> close (a11y)
  *    • clicking another cell anywhere in the toolkit -> the first closes
  *      (only one open at a time, managed by the web component)
+ *    • tapping outside or moving focus away -> close
  *    • hovering away does NOT close a toggled-open cell
  */
 import { toolGroups } from "../config/toolkit";
@@ -204,6 +205,9 @@ const pad = (n: number) => String(n).padStart(2, "0");
     private ind = { x: 0, w: 0, ready: false };
 
     connectedCallback() {
+      const events = new AbortController();
+      const { signal } = events;
+      this.cleanupFns.push(() => events.abort());
       const filterBtns = Array.from(
         this.querySelectorAll<HTMLButtonElement>("[data-filter]"),
       );
@@ -256,11 +260,11 @@ const pad = (n: number) => String(n).padStart(2, "0");
       };
 
       filterBtns.forEach((btn) => {
-        btn.addEventListener("mouseenter", () => playSound("hover"));
+        btn.addEventListener("mouseenter", () => playSound("hover"), { signal });
         btn.addEventListener("click", () => {
           applyFilter(btn.dataset.filter ?? "all");
           playSound("click");
-        });
+        }, { signal });
       });
 
       measure();
@@ -316,14 +320,28 @@ const pad = (n: number) => String(n).padStart(2, "0");
       };
 
       cells.forEach((cell) => {
-        cell.addEventListener("mouseenter", () => playSound("hover"));
+        cell.addEventListener("mouseenter", () => playSound("hover"), { signal });
         cell.addEventListener("click", () => {
           const wrapper = cell.closest("[data-tk-cell]");
-          if (!wrapper?.classList.contains("has-note")) return;
+          if (!wrapper?.classList.contains("has-note")) {
+            closeActive();
+            return;
+          }
           toggleCell(cell.dataset.cell ?? "");
           playSound("click");
-        });
+        }, { signal });
       });
+
+      document.addEventListener("pointerdown", (event) => {
+        const active = this.querySelector("[data-tk-cell].is-open");
+        if (active && !active.contains(event.target as Node)) closeActive();
+      }, { signal });
+      this.addEventListener("focusout", (event) => {
+        const active = this.querySelector("[data-tk-cell].is-open");
+        if (active?.contains(event.target as Node) && !active.contains(event.relatedTarget as Node | null)) {
+          closeActive();
+        }
+      }, { signal });
 
       // Escape closes an open cell (a11y)
       const onKey = (e: KeyboardEvent) => {

@@ -1,5 +1,5 @@
 <!--
-  ThemeToggle — dark/light switch with a circular reveal animation.
+  ThemeToggle — dark/light switch with a desktop circle and mobile fade.
 
   • theme is one of "dark" | "light"
   • persisted to localStorage("theme")
@@ -20,8 +20,8 @@
   Uses the View Transitions API (Chrome/Edge 111+) to animate the theme
   switch as a circle expanding from the toggle button's click point —
   the new theme "wipes in" radially instead of swapping instantly.
-  Falls back to an instant class swap on browsers without VT support
-  (Safari, Firefox) — still works, just without the animation.
+  Touch devices and narrow screens use a short fade. Browsers without
+  View Transitions support fall back to an instant class swap.
 -->
 <theme-toggle>
   <!-- aria-label / title are static ("toggle theme") rather than
@@ -75,14 +75,23 @@
   import { playSound } from "../scripts/sound-init";
 
   class ThemeToggleEl extends HTMLElement {
+    private events?: AbortController;
+
     connectedCallback() {
+      this.events?.abort();
+      this.events = new AbortController();
+      const { signal } = this.events;
       const btn = this.querySelector<HTMLButtonElement>(".theme-toggle-btn");
       if (!btn) return;
 
-      btn.addEventListener("mouseenter", () => playSound("hover"));
+      btn.addEventListener("mouseenter", () => playSound("hover"), { signal });
       btn.addEventListener("click", () => {
         void this.toggle();
-      });
+      }, { signal });
+    }
+
+    disconnectedCallback() {
+      this.events?.abort();
     }
 
     private async toggle() {
@@ -112,7 +121,7 @@
         window.dispatchEvent(new Event("resize"));
       };
 
-      // View Transitions API → circular reveal
+      // View Transitions API → fade on mobile, circular reveal on desktop.
       const vt = (
         document as Document & {
           startViewTransition?: (cb: () => void) => { ready: Promise<void> };
@@ -120,6 +129,7 @@
       ).startViewTransition;
 
       if (vt && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const mobile = window.matchMedia("(max-width: 767px), (hover: none), (pointer: coarse)").matches;
         const transition = vt.call(document, apply);
         await transition.ready;
         const endRadius = Math.hypot(
@@ -127,14 +137,14 @@
           Math.max(y, window.innerHeight - y),
         );
         document.documentElement.animate(
-          {
+          mobile ? { opacity: [0, 1] } : {
             clipPath: [
               `circle(0px at ${x}px ${y}px)`,
               `circle(${endRadius}px at ${x}px ${y}px)`,
             ],
           },
           {
-            duration: 520,
+            duration: mobile ? 220 : 520,
             easing: "cubic-bezier(0.22, 1, 0.36, 1)",
             pseudoElement: "::view-transition-new(root)",
           },

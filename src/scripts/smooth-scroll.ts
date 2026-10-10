@@ -8,14 +8,13 @@ export const getLenis = () => lenis;
 if (typeof window !== "undefined" && !initialized) {
   initialized = true;
   const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const desktop = window.matchMedia("(min-width: 768px) and (hover: hover) and (pointer: fine)");
 
   const create = () => {
-    if (motion.matches || lenis) return;
+    if (motion.matches || !desktop.matches || lenis) return;
     lenis = new Lenis({
       autoRaf: true,
       anchors: { duration: 1.1, lock: true },
-      syncTouch: true,
-      syncTouchLerp: 0.075,
       prevent: (node) => Boolean(node.closest("[data-lenis-prevent], pre")),
     });
     if (document.documentElement.dataset.loaderState === "loading") lenis.stop();
@@ -25,8 +24,8 @@ if (typeof window !== "undefined" && !initialized) {
     lenis?.destroy();
     lenis = null;
   };
-  const onMotionChange = () => {
-    if (motion.matches) destroy();
+  const onPreferenceChange = () => {
+    if (motion.matches || !desktop.matches) destroy();
     else create();
   };
   const onLoaderState = (event: Event) => {
@@ -69,7 +68,8 @@ if (typeof window !== "undefined" && !initialized) {
   };
 
   create();
-  motion.addEventListener("change", onMotionChange);
+  motion.addEventListener("change", onPreferenceChange);
+  desktop.addEventListener("change", onPreferenceChange);
   window.addEventListener("loader:statechange", onLoaderState);
   window.addEventListener("click", onAnchorClick, { capture: true });
 }

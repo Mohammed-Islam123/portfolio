@@ -12,6 +12,7 @@ export const UI_ICONS: Record<string, string> = {
   "arrow-left": `<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>`,
   "arrow-up": `<path d="m18 15-6-6-6 6"/>`,
   "chevron-right": `<path d="m9 18 6-6-6-6"/>`,
+  "chevron-down": `<path d="m6 9 6 6 6-6"/>`,
   list: `<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>`,
   "layout-grid": `<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/>`,
   copy: `<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>`,

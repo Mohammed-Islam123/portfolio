@@ -1,6 +1,6 @@
 ---
 /**
- * TechIcon — renders a tech logo from simple-icons, or a 2-letter mono
+ * TechIcon — renders an official asset, a simple-icons logo, or a 2-letter mono
  * abbreviation for tools that don't have a logo ("abbr:XX" syntax).
  *
  * Rendered entirely at build time (server-side) — zero client JS.
@@ -10,7 +10,10 @@
  * @prop size  px size of the svg
  */
 import {
+  siArduino,
+  siCplusplus,
   siDotnet,
+  siEspressif,
   siPostgresql,
   siDocker,
   siRust,
@@ -20,6 +23,7 @@ import {
   siTailwindcss,
   siRedis,
   siGithubactions,
+  siGooglegemini,
   siLinux,
   siGit,
   siJsonwebtokens,
@@ -32,11 +36,19 @@ import {
   siGrafana,
   siKubernetes,
   siPrometheus,
+  siPython,
+  siRabbitmq,
+  siWebrtc,
+  siMqtt,
+  siPlatformio,
   type SimpleIcon,
 } from "simple-icons";
 
 const REGISTRY: Record<string, SimpleIcon> = {
+  arduino: siArduino,
+  cplusplus: siCplusplus,
   dotnet: siDotnet,
+  espressif: siEspressif,
   postgresql: siPostgresql,
   docker: siDocker,
   rust: siRust,
@@ -46,6 +58,7 @@ const REGISTRY: Record<string, SimpleIcon> = {
   tailwindcss: siTailwindcss,
   redis: siRedis,
   githubactions: siGithubactions,
+  googlegemini: siGooglegemini,
   linux: siLinux,
   git: siGit,
   jsonwebtokens: siJsonwebtokens,
@@ -58,6 +71,11 @@ const REGISTRY: Record<string, SimpleIcon> = {
   grafana: siGrafana,
   kubernetes: siKubernetes,
   prometheus: siPrometheus,
+  python: siPython,
+  rabbitmq: siRabbitmq,
+  webrtc: siWebrtc,
+  mqtt: siMqtt,
+  platformio: siPlatformio,
 };
 
 interface Props {
@@ -69,6 +87,12 @@ interface Props {
 
 const { icon, brand, size = 22, class: className } = Astro.props;
 
+const ASSETS: Record<string, string> = {
+  csharp: "/icons/tech/csharp.png",
+  efcore: "/icons/tech/efcore.svg",
+  aspire: "/icons/tech/aspire.svg",
+};
+const asset = ASSETS[icon];
 const isAbbr = icon.startsWith("abbr:");
 // unknown slug — fall back to the first 2 letters
 const abbr = isAbbr
@@ -80,7 +104,17 @@ const data = !isAbbr && !abbr ? REGISTRY[icon] : null;
 ---
 
 {
-  data ? (
+  asset ? (
+    <img
+      class={className}
+      src={asset}
+      width={size}
+      height={size}
+      alt=""
+      aria-hidden="true"
+      draggable="false"
+    />
+  ) : data ? (
     <svg
       class={className}
       width={size}

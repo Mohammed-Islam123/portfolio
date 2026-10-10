@@ -6,11 +6,28 @@
 export type SocialLink = {
   label: string;
   href: string;
-  /** icon key consumed by <SocialIcon /> — github | linkedin | whatsapp | email */
-  icon: "github" | "linkedin" | "whatsapp" | "email";
+  /** icon key consumed by <SocialIcon /> or <UiIcon /> */
+  icon: "github" | "linkedin" | "whatsapp" | "email" | "telegram" | "portfolio";
 };
 
+export type ContactPlatform = {
+  id: "whatsapp" | "linkedin" | "email" | "telegram";
+  label: string;
+  href: string;
+  icon: "whatsapp" | "linkedin" | "email" | "telegram";
+  colorRgb: string;
+  colorHex: string;
+};
+
+const firstName = "Mohamed Islam";
+const contactEmail = "mohammedislam.benyahkem@gmail.com";
+const contactMessageTemplate = `Hi ${firstName}, I came across your portfolio and would like to connect.`;
+const emailSubject = "Exploring a Potential Opportunity";
+const emailBodyTemplate = `Dear ${firstName},\n\nI came across your portfolio and would like to get in touch regarding a potential opportunity. Please let me know if you would be available to discuss it.\n\nKind regards,\n[Your name]`;
+const emailHref = `mailto:${contactEmail}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBodyTemplate)}`;
+
 export const siteConfig = {
+  firstName,
   name: "Mohamed Islam Benyahkem",
   fullName: "Mohamed Islam Benyahkem",
   role: "Backend Engineer",
@@ -23,14 +40,65 @@ export const siteConfig = {
     label: "open to work",
     available: true,
   },
-  email: "hello@mohamedislam.dev", // placeholder — replace with real
+  email: contactEmail,
   /** CV download — drop the real file in /public to make the button work. */
   cvUrl: "/cv-mohamed-islam.pdf",
+  contactCopy: {
+    headline: "if you've made it this far,",
+    action: "Say hi",
+    profiles: "or find me on",
+  },
+  /** Prefilled messages for the contact links */
+  contactMessageTemplate,
+  emailSubject,
+  emailBodyTemplate,
+  /** Platforms available in the interactive contact selector */
+  contactPlatforms: [
+    {
+      id: "whatsapp",
+      label: "WhatsApp",
+      href: `https://wa.me/213794839435?text=${encodeURIComponent(contactMessageTemplate)}`,
+      icon: "whatsapp",
+      colorRgb: "37, 211, 102",
+      colorHex: "#25D366",
+    },
+    {
+      id: "linkedin",
+      label: "LinkedIn",
+      href: "https://www.linkedin.com/in/islam-benyahkem",
+      icon: "linkedin",
+      colorRgb: "10, 102, 194",
+      colorHex: "#0A66C2",
+    },
+    {
+      id: "email",
+      label: "Email",
+      href: emailHref,
+      icon: "email",
+      colorRgb: "234, 67, 53",
+      colorHex: "#EA4335",
+    },
+    {
+      id: "telegram",
+      label: "Telegram",
+      href: "https://t.me/ExtraIslam",
+      icon: "telegram",
+      colorRgb: "36, 161, 222",
+      colorHex: "#24A1DE",
+    },
+  ] as ContactPlatform[],
+  /** Secondary social profiles displayed below the CTA */
+  socialProfiles: [
+    { label: "GitHub", href: "https://github.com/Mohammed-Islam123", icon: "github" },
+    { label: "LinkedIn", href: "https://www.linkedin.com/in/islam-benyahkem", icon: "linkedin" },
+    { label: "Portfolio", href: "/", icon: "portfolio" },
+  ] as SocialLink[],
   socials: [
-    { label: "github", href: "https://github.com", icon: "github" },
-    { label: "linkedin", href: "https://www.linkedin.com", icon: "linkedin" },
-    { label: "whatsapp", href: "https://wa.me/213000000000", icon: "whatsapp" },
-    { label: "email", href: "mailto:hello@mohamedislam.dev", icon: "email" },
+    { label: "github", href: "https://github.com/Mohammed-Islam123", icon: "github" },
+    { label: "linkedin", href: "https://www.linkedin.com/in/islam-benyahkem", icon: "linkedin" },
+    { label: "whatsapp", href: "https://wa.me/213794839435", icon: "whatsapp" },
+    { label: "email", href: `mailto:${contactEmail}`, icon: "email" },
+    { label: "telegram", href: "https://t.me/ExtraIslam", icon: "telegram" },
   ] as SocialLink[],
   /**
    * Hero greeting rotates through these on a timer.
