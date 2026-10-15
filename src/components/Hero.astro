@@ -30,7 +30,6 @@
  */
 import { siteConfig } from "../config/site";
 import DotField from "./DotField.astro";
-import HeroJourney from "./HeroJourney.astro";
 import Greeting from "./Greeting.astro";
 import ScrambleName from "./ScrambleName.astro";
 ---
@@ -103,13 +102,11 @@ import ScrambleName from "./ScrambleName.astro";
       <!-- The image is intentionally large and borderless. The bottom
            mask begins behind the text and dissolves into the page colour. -->
       <img
-        src="/portrait-hero.png"
+        src="/portrait-hero.webp"
         alt="Mohamed Islam Benyahkem"
         loading="eager"
         class="hero-portrait relative block h-[clamp(42rem,104svh,70rem)] w-auto max-w-[94vw] -translate-y-[clamp(0.75rem,3vh,2.5rem)] object-contain bw-img" />
     </div>
-
-    <HeroJourney />
 
     <!-- The copy overlays the portrait's lower fade instead of sitting
          below it. "I am" remains aligned to the name's left edge. -->
