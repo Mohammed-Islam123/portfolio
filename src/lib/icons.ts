@@ -7,6 +7,7 @@
  */
 
 export const UI_ICONS: Record<string, string> = {
+  close: `<path d="m6 6 12 12"/><path d="M6 18 18 6"/>`,
   "arrow-up-right": `<path d="M7 7h10v10"/><path d="M7 17 17 7"/>`,
   "arrow-right": `<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>`,
   "arrow-left": `<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>`,

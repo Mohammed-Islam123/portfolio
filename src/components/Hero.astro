@@ -32,6 +32,7 @@ import { siteConfig } from "../config/site";
 import DotField from "./DotField.astro";
 import Greeting from "./Greeting.astro";
 import ScrambleName from "./ScrambleName.astro";
+import HeroJourney from "./HeroJourney.astro";
 ---
 
 <hero-section
@@ -42,6 +43,7 @@ import ScrambleName from "./ScrambleName.astro";
 >
   <!-- shader background -->
   <DotField />
+  <HeroJourney />
 
   <!-- ── live clock (top-left, scrolls with hero, lg+) ────────────
        VISIBLE FROM FRAME 1 — not gated on the loader. The clock is
@@ -158,7 +160,8 @@ import ScrambleName from "./ScrambleName.astro";
       <div class="hero-gated mt-8 mb-16 flex flex-wrap items-center justify-center gap-3 hf-800-600">
         <a
           href={siteConfig.cvUrl}
-          download
+          target="_blank"
+          rel="noopener noreferrer"
           class="group/cv inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--surface-2)] px-5 py-2.5 font-mono text-xs tracking-[0.06em] text-[var(--ink)] transition-[transform,border-color,background-color] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 hover:border-[var(--ink-muted)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
         >
           <!-- download icon (lucide "download", inlined) -->

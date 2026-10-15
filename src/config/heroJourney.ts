@@ -1,7 +1,5 @@
 /**
- * Drop JPG, PNG, WebP, AVIF, MP4 or WebM files into src/assets/hero-journey/.
- * Files appear automatically after a rebuild. Add an entry here only when a
- * better description, caption, or crop is needed. Filenames are exact.
+ * Hero photos live in public/Images/Hero/. Keep captions empty until ready.
  */
 export interface HeroJourneyMedia {
   type: "image" | "video";
@@ -20,39 +18,14 @@ type HeroJourneyDetail = { file: string } &
   Partial<Pick<HeroJourneyMedia, "description" | "caption" | "cropPosition">>;
 
 export const heroJourneyDetails: HeroJourneyDetail[] = [
-  {
-    file: "robotics-workbench.png",
-    description: "Robotics workbench with a wheeled prototype",
-    caption: "Robotics workbench",
-  },
-  {
-    file: "engineering-competition.png",
-    description: "Engineering competition worktable",
-    caption: "Competition day",
-  },
-  {
-    file: "iot-prototype.png",
-    description: "Connected sensor prototype on a workbench",
-    caption: "Connected prototype",
-  },
-  {
-    file: "development-workstation.png",
-    description: "Software development workstation",
-    caption: "Development work",
-  },
-  {
-    file: "robotic-arm-prototype.png",
-    description: "Robotic arm prototype in a lab",
-    caption: "Robotic arm",
-  },
-  {
-    file: "hackathon-prototype.png",
-    description: "Hackathon electronics prototype",
-    caption: "Prototype session",
-  },
-  {
-    file: "robotics-motion-sample.mp4",
-    description: "Animated view of a robotics workbench",
-    caption: "Prototype motion",
-  },
+  { file: "Afrobot_Participation.webp", caption: "" },
+  { file: "AlphaAI.webp", caption: "" },
+  { file: "Alphabit_Coding_Challenge.webp", caption: "" },
+  { file: "Djezzy_INNOVTECH.webp", caption: "" },
+  { file: "Event_Victory.webp", caption: "" },
+  { file: "Fighting_Robot_Prep1.webp", caption: "" },
+  { file: "Fighting_Robot_Prer2.webp", caption: "" },
+  { file: "HIV_Awareness_Event.webp", caption: "" },
+  { file: "SAHM_Project_Prep.webp", caption: "" },
+  { file: "winning_idathon.webp", caption: "" },
 ];

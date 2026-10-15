@@ -41,8 +41,8 @@ export const siteConfig = {
     available: true,
   },
   email: contactEmail,
-  /** CV download — drop the real file in /public to make the button work. */
-  cvUrl: "/cv-mohamed-islam.pdf",
+  /** CV download link. */
+  cvUrl: "https://drive.google.com/file/d/1UNMNZX2Nvq2WVbXTT--Py-Vqx3dXQSv8/view?usp=drive_link",
   contactCopy: {
     headline: "if you've made it this far,",
     action: "Say hi",

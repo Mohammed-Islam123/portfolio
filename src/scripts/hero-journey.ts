@@ -3,7 +3,6 @@ import type { HeroJourneyMedia } from "../config/heroJourney";
 interface JourneySlot {
   card: HTMLDivElement;
   face: HTMLButtonElement;
-  close: HTMLButtonElement;
   index: number;
   progress: number;
   duration: number;
@@ -43,6 +42,9 @@ class HeroJourneyEl extends HTMLElement {
   private mountVersion = 0;
   private pointerX = 0;
   private pointerY = 0;
+  private viewerSlot: JourneySlot | null = null;
+  private viewerAnimation: Animation | null = null;
+  private viewerClosing = false;
 
   connectedCallback() {
     this.mountVersion++;
@@ -101,43 +103,56 @@ class HeroJourneyEl extends HTMLElement {
       this.pointerY = clamp((event.clientY - rect.top) / rect.height * 2 - 1, -1, 1);
       if (!this.frame) this.render();
     };
-    const onOutside = (event: PointerEvent) => {
-      for (const slot of this.slots) {
-        if (slot.pinned && !slot.card.contains(event.target as Node)) {
-          slot.pinned = false;
-          slot.dismissed = true;
-          this.syncExpansion(slot);
-        }
+    const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer")!;
+    const onViewerClick = (event: MouseEvent) => {
+      if (event.target === viewer ||
+          (event.target as Element).closest(".journey-viewer-close")) void this.closeViewer();
+    };
+    const onViewerCancel = (event: Event) => {
+      event.preventDefault();
+      void this.closeViewer();
+    };
+    const onViewerClose = () => {
+      this.restoreCursorFromViewer(viewer);
+      this.viewerAnimation?.cancel();
+      this.viewerAnimation = null;
+      this.viewerClosing = false;
+      const slot = this.viewerSlot;
+      this.viewerSlot = null;
+      viewer.querySelector(".journey-viewer-content")?.replaceChildren();
+      if (slot) {
+        delete slot.card.dataset.viewing;
+        slot.pinned = false;
+        slot.dismissed = true;
+        this.syncExpansion(slot);
       }
     };
-    const onKeydown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      let dismissed = false;
-      for (const slot of this.slots) {
-        if (slot.pinned || slot.focused) {
-          slot.pinned = false;
-          slot.dismissed = true;
-          this.syncExpansion(slot);
-          dismissed = true;
-        }
-      }
-      if (dismissed) event.stopPropagation();
-    };
+    viewer.addEventListener("click", onViewerClick);
+    viewer.addEventListener("close", onViewerClose);
+    viewer.addEventListener("cancel", onViewerCancel);
     document.addEventListener("visibilitychange", onVisibility);
-    document.addEventListener("pointerdown", onOutside);
-    document.addEventListener("keydown", onKeydown);
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     motionQuery.addEventListener("change", onMotion);
     this.cleanupFns.push(() => {
       document.removeEventListener("visibilitychange", onVisibility);
-      document.removeEventListener("pointerdown", onOutside);
-      document.removeEventListener("keydown", onKeydown);
+      viewer.removeEventListener("click", onViewerClick);
+      viewer.removeEventListener("close", onViewerClose);
+      viewer.removeEventListener("cancel", onViewerCancel);
       window.removeEventListener("pointermove", onPointerMove);
       motionQuery.removeEventListener("change", onMotion);
     });
   }
 
   disconnectedCallback() {
+    this.viewerAnimation?.cancel();
+    this.viewerAnimation = null;
+    this.viewerClosing = false;
+    const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer");
+    if (viewer) {
+      this.restoreCursorFromViewer(viewer);
+      viewer.close();
+    }
+    this.viewerSlot = null;
     this.mountVersion++;
     window.clearTimeout(this.revealTimer);
     this.revealTimer = 0;
@@ -148,9 +163,9 @@ class HeroJourneyEl extends HTMLElement {
       window.clearTimeout(slot.settleTimer);
       slot.generation++;
       this.stopVideo(slot);
+      slot.card.remove();
     }
     this.slots = [];
-    this.replaceChildren();
     this.preloadQueue = [];
     this.preparedSources.clear();
     this.preloading = 0;
@@ -221,15 +236,10 @@ class HeroJourneyEl extends HTMLElement {
     const face = document.createElement("button");
     face.type = "button";
     face.className = "journey-face";
-    face.setAttribute("aria-expanded", "false");
-    const close = document.createElement("button");
-    close.type = "button";
-    close.className = "journey-close";
-    close.setAttribute("aria-label", "Close media preview");
-    close.textContent = "×";
-    card.append(face, close);
+    face.setAttribute("aria-haspopup", "dialog");
+    card.append(face);
     const slot: JourneySlot = {
-      card, face, close, index,
+      card, face, index,
       progress: -index * 0.025,
       duration: randomDuration(this.duration),
       generation: 0,
@@ -265,23 +275,71 @@ class HeroJourneyEl extends HTMLElement {
       }
     });
     face.addEventListener("click", () => {
-      if (slot.pinned) {
-        slot.pinned = false;
-        slot.dismissed = true;
-      } else {
-        slot.pinned = true;
-        slot.dismissed = false;
-      }
-      this.syncExpansion(slot);
-    });
-    close.addEventListener("click", (event) => {
-      event.stopPropagation();
-      slot.pinned = false;
-      slot.dismissed = true;
-      close.blur();
+      const media = face.querySelector<HTMLImageElement | HTMLVideoElement>(".journey-media");
+      const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer");
+      if (!media || !viewer || slot.card.dataset.ready !== "true") return;
+      const origin = media.getBoundingClientRect();
+      const expanded = media.cloneNode(true) as HTMLImageElement | HTMLVideoElement;
+      expanded.className = "journey-viewer-media";
+      expanded.style.objectPosition = "";
+      if (expanded instanceof HTMLVideoElement) expanded.controls = true;
+      viewer.querySelector(".journey-viewer-content")!.replaceChildren(expanded);
+      slot.pinned = true;
+      slot.dismissed = false;
+      this.viewerSlot = slot;
+      slot.card.dataset.viewing = "true";
+      const ratio = media instanceof HTMLImageElement
+        ? media.naturalWidth / media.naturalHeight
+        : media.videoWidth / media.videoHeight;
+      viewer.style.setProperty("--viewer-ratio", String(ratio));
+      this.moveCursorIntoViewer(viewer);
+      viewer.showModal();
+      if (!motionQuery.matches) this.viewerAnimation = this.animateViewer(origin);
       this.syncExpansion(slot);
     });
     return slot;
+  }
+
+  private animateViewer(origin: DOMRect, reverse = false) {
+    const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer")!;
+    const target = viewer.getBoundingClientRect();
+    const x = origin.left + origin.width / 2 - target.left - target.width / 2;
+    const y = origin.top + origin.height / 2 - target.top - target.height / 2;
+    return viewer.animate([
+      { width: `${origin.width}px`, height: `${origin.height}px`, transform: `translate(${x}px, ${y}px)` },
+      { width: `${target.width}px`, height: `${target.height}px`, transform: "translate(0px, 0px)" },
+    ], {
+      duration: reverse ? 240 : 480,
+      easing: getComputedStyle(this).getPropertyValue("--ease").trim(),
+      direction: reverse ? "reverse" : "normal",
+    });
+  }
+
+  private async closeViewer() {
+    const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer");
+    if (!viewer?.open || this.viewerClosing) return;
+    this.viewerClosing = true;
+    const origin = this.viewerSlot?.face.getBoundingClientRect();
+    if (!motionQuery.matches && origin) {
+      if (this.viewerAnimation?.playState === "running") {
+        this.viewerAnimation.reverse();
+        this.viewerAnimation.updatePlaybackRate(-2);
+      } else {
+        this.viewerAnimation = this.animateViewer(origin, true);
+      }
+      const animation = this.viewerAnimation;
+      await animation.finished.catch(() => {});
+      if (this.viewerAnimation !== animation) return;
+    }
+    viewer.close();
+  }
+
+  private moveCursorIntoViewer(viewer: HTMLDialogElement) {
+    viewer.append(...document.documentElement.querySelectorAll(".c-dot, .c-ring, .c-drag-label"));
+  }
+
+  private restoreCursorFromViewer(viewer: HTMLDialogElement) {
+    document.documentElement.append(...viewer.querySelectorAll(".c-dot, .c-ring, .c-drag-label"));
   }
 
   private syncExpansion(slot: JourneySlot) {
@@ -296,8 +354,6 @@ class HeroJourneyEl extends HTMLElement {
       }
     }
     slot.card.dataset.expanded = String(expanded);
-    slot.card.dataset.pinned = String(slot.pinned);
-    slot.face.setAttribute("aria-expanded", String(expanded));
     this.render();
     if (changed && !motionQuery.matches) {
       slot.settleTimer = window.setTimeout(() => {
