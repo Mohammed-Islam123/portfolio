@@ -1,140 +1,49 @@
 ---
-/**
- * TechIcon — renders an official asset, a simple-icons logo, or a 2-letter mono
- * abbreviation for tools that don't have a logo ("abbr:XX" syntax).
- *
- * Rendered entirely at build time (server-side) — zero client JS.
- *
- * @prop icon  simple-icons slug (e.g. "dotnet") or "abbr:EF"
- * @prop brand hex color used for the glyph (matches the cell's brand)
- * @prop size  px size of the svg
- */
-import {
-  siArduino,
-  siCplusplus,
-  siDotnet,
-  siEspressif,
-  siPostgresql,
-  siDocker,
-  siRust,
-  siReact,
-  siTypescript,
-  siAstro,
-  siTailwindcss,
-  siRedis,
-  siGithubactions,
-  siGooglegemini,
-  siLinux,
-  siGit,
-  siJsonwebtokens,
-  siRos,
-  siHtml5,
-  siGnubash,
-  siNginx,
-  siGo,
-  siClickhouse,
-  siGrafana,
-  siKubernetes,
-  siPrometheus,
-  siPython,
-  siRabbitmq,
-  siWebrtc,
-  siMqtt,
-  siPlatformio,
-  type SimpleIcon,
-} from "simple-icons";
-
-const REGISTRY: Record<string, SimpleIcon> = {
-  arduino: siArduino,
-  cplusplus: siCplusplus,
-  dotnet: siDotnet,
-  espressif: siEspressif,
-  postgresql: siPostgresql,
-  docker: siDocker,
-  rust: siRust,
-  react: siReact,
-  typescript: siTypescript,
-  astro: siAstro,
-  tailwindcss: siTailwindcss,
-  redis: siRedis,
-  githubactions: siGithubactions,
-  googlegemini: siGooglegemini,
-  linux: siLinux,
-  git: siGit,
-  jsonwebtokens: siJsonwebtokens,
-  ros: siRos,
-  html5: siHtml5,
-  gnubash: siGnubash,
-  nginx: siNginx,
-  go: siGo,
-  clickhouse: siClickhouse,
-  grafana: siGrafana,
-  kubernetes: siKubernetes,
-  prometheus: siPrometheus,
-  python: siPython,
-  rabbitmq: siRabbitmq,
-  webrtc: siWebrtc,
-  mqtt: siMqtt,
-  platformio: siPlatformio,
-};
+import { technologies, type Technology, type TechnologyId } from "../../config/technologies";
 
 interface Props {
-  icon: string;
-  brand: string;
+  technology: TechnologyId;
   size?: number;
   class?: string;
 }
 
-const { icon, brand, size = 22, class: className } = Astro.props;
-
-const ASSETS: Record<string, string> = {
-  csharp: "/icons/tech/csharp.png",
-  efcore: "/icons/tech/efcore.svg",
-  aspire: "/icons/tech/aspire.svg",
-};
-const asset = ASSETS[icon];
-const isAbbr = icon.startsWith("abbr:");
-// unknown slug — fall back to the first 2 letters
-const abbr = isAbbr
-  ? icon.slice(5).toUpperCase()
-  : REGISTRY[icon]
-    ? null
-    : icon.slice(0, 2).toUpperCase();
-const data = !isAbbr && !abbr ? REGISTRY[icon] : null;
+const { technology, size = 22, class: className } = Astro.props;
+const tech: Technology = technologies[technology];
+const icon = tech.icon;
 ---
 
 {
-  asset ? (
-    <img
-      class={className}
-      src={asset}
-      width={size}
-      height={size}
-      alt=""
-      aria-hidden="true"
-      draggable="false"
-    />
-  ) : data ? (
+  icon && ("src" in icon ? (
+    <>
+      <img
+        class:list={["object-contain", className, { "hidden dark:block": !!icon.lightSrc }]}
+        src={icon.src}
+        width={size}
+        height={size}
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+      />
+      {icon.lightSrc && <img
+        class:list={["object-contain dark:hidden", className]}
+        src={icon.lightSrc}
+        width={size}
+        height={size}
+        alt=""
+        aria-hidden="true"
+        draggable="false"
+      />}
+    </>
+  ) : (
     <svg
       class={className}
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill={brand}
+      fill={tech.monochrome ? "currentColor" : `#${icon.hex}`}
       aria-hidden="true"
     >
-      <path d={data.path} />
+      <path d={icon.path} />
     </svg>
-  ) : (
-    // AbbrGlyph — a 2-letter abbreviation wrapped in a brand-colored ghost
-    // frame so abbreviated tools (EF, SR, QC) have the same visual weight
-    // as logo icons.
-    <span
-      class={className}
-      style={`display: inline-flex; align-items: center; justify-content: center; width: ${size}px; height: ${size}px; border-radius: ${Math.max(4, size * 0.18)}px; border: 1px solid ${brand}40; background: ${brand}10; font-family: var(--font-mono); font-weight: 700; font-size: ${size * 0.42}px; line-height: 1; color: ${brand}; letter-spacing: -0.02em;`}
-      aria-hidden="true"
-    >
-      {abbr}
-    </span>
-  )
+  ))
 }

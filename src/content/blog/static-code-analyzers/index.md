@@ -5,7 +5,7 @@ pubDate: 2025-08-02
 tags: ["C#", "Code Quality", "Static Analysis", "Development Tools", "Best Practices"]
 thumbnail: ./feature.svg
 thumbnailAlt: "Static Code Analyzers — feature illustration"
-draft: false
+draft: true
 ---
 
 A clean codebase is not a destination; it is a discipline. The moment you stop

@@ -1,0 +1,38 @@
+---
+import DotField from "./DotField.astro";
+import UiIcon from "./icons/UiIcon.astro";
+
+interface Props {
+  label: string;
+  title: string;
+  description: string;
+}
+
+const { label, title, description } = Astro.props;
+---
+
+<main class="page-message">
+  <DotField />
+  <div class="wrap page-message__content">
+    <p class="page-message__label">{label}</p>
+    <h1>{title}</h1>
+    <p class="page-message__description">{description}</p>
+    <div class="page-message__links">
+      <a href="/" class="page-message__home">
+        <UiIcon name="arrow-left" size={16} />
+        <span>Take me back</span>
+      </a>
+    </div>
+  </div>
+</main>
+
+<style>
+  .page-message { position: relative; display: grid; min-height: 100svh; place-items: center; overflow: hidden; padding: calc(var(--nav-h) + 3rem) 0 5rem; }
+  .page-message__content { position: relative; z-index: 1; width: 100%; text-align: center; }
+  .page-message__label { margin: 0 0 1.5rem; font-family: var(--font-mono); font-size: 0.875rem; letter-spacing: 0.2em; color: var(--ink-dim); }
+  h1 { max-width: 55rem; margin: 0 auto; font-family: var(--font-display); font-size: clamp(2.75rem, 8vw, 6rem); font-weight: 650; letter-spacing: -0.055em; line-height: 1; color: var(--ink); }
+  .page-message__description { max-width: 30rem; margin: 1.5rem auto 0; font-size: 1rem; line-height: 1.7; color: var(--ink-muted); }
+  .page-message__links { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 1.5rem; margin-top: 2rem; font-family: var(--font-mono); font-size: 0.8125rem; }
+  .page-message__home { display: inline-flex; min-height: 2.75rem; align-items: center; gap: 0.625rem; padding: 0.625rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); text-decoration: none; }
+  .page-message__home:hover { border-color: var(--ink-muted); background: var(--surface-2); }
+</style>

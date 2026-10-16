@@ -36,6 +36,7 @@ import Section from "./primitives/Section.astro";
 import SectionLabel from "./primitives/SectionLabel.astro";
 import Reveal from "./primitives/Reveal.astro";
 import TechIcon from "./icons/TechIcon.astro";
+import { technologies } from "../config/technologies";
 import UiIcon from "./icons/UiIcon.astro";
 
 /**
@@ -241,7 +242,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
                   />}
                   {!p.image && primaryTech && (
                     <div class="absolute -right-3 bottom-3 opacity-[0.12]">
-                      <TechIcon icon={primaryTech.icon} brand={primaryTech.brand} size={120} />
+                      <TechIcon technology={primaryTech} size={120} />
                     </div>
                   )}
                   <div
@@ -274,8 +275,8 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
                   <div class="mt-4 flex flex-wrap gap-1.5 pb-2">
                     {p.tech.map((tech) => (
                       <span class="project-tech-chip inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-[var(--surface-2)] px-2.5 py-1 font-mono text-xs text-[var(--ink-muted)]">
-                        <TechIcon icon={tech.icon} brand={tech.brand || "var(--ink-dim)"} size={12} />
-                        {tech.label}
+                        <TechIcon technology={tech} size={12} />
+                        {technologies[tech].label}
                       </span>
                     ))}
                   </div>
@@ -371,8 +372,8 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
                     <div class="flex flex-wrap gap-1.5">
                       {p.tech.map((tech) => (
                         <span class="project-tech-chip inline-flex items-center gap-1.5 rounded-full border border-[var(--line-soft)] bg-[var(--surface-2)] px-2.5 py-1 font-mono text-xs text-[var(--ink-muted)]">
-                          <TechIcon icon={tech.icon} brand={tech.brand || "var(--ink-dim)"} size={12} />
-                          {tech.label}
+                          <TechIcon technology={tech} size={12} />
+                          {technologies[tech].label}
                         </span>
                       ))}
                     </div>

@@ -3,6 +3,8 @@ import Layout from "../../../layouts/Layout.astro";
 import BlogBar from "../../../components/BlogBar.astro";
 import Reveal from "../../../components/primitives/Reveal.astro";
 import { collectTags, getPosts } from "../../../lib/blog";
+import PageMessage from "../../../components/PageMessage.astro";
+import { pageMessages } from "../../../config/pageMessages";
 
 const posts = await getPosts();
 const tags = collectTags(posts);
@@ -10,6 +12,7 @@ const tags = collectTags(posts);
 
 <Layout title="Tags · Blog · Mohamed Islam" description="Browse blog posts by topic.">
   <BlogBar />
+  {tags.length === 0 ? <PageMessage {...pageMessages.tagsEmpty} /> : (
   <main class="tag-page">
     <div class="wrap tag-page__inner">
       <Reveal delay={70}><h1>Browse by tag.</h1></Reveal>
@@ -21,6 +24,7 @@ const tags = collectTags(posts);
       </Reveal>
     </div>
   </main>
+  )}
 </Layout>
 
 <style>

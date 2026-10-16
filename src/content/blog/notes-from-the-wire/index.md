@@ -5,7 +5,7 @@ pubDate: 2025-09-20
 tags: ["Protocols", "Networking", "Rust", "Backend"]
 thumbnail: ./feature.svg
 thumbnailAlt: "Notes from the Wire — feature illustration"
-draft: false
+draft: true
 ---
 
 When you control both ends of a wire, you do strange things. You invent

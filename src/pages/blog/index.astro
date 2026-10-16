@@ -4,6 +4,8 @@ import BlogBar from "../../components/BlogBar.astro";
 import BlogCard from "../../components/BlogCard.astro";
 import Reveal from "../../components/primitives/Reveal.astro";
 import { getPosts } from "../../lib/blog";
+import PageMessage from "../../components/PageMessage.astro";
+import { pageMessages } from "../../config/pageMessages";
 
 const posts = await getPosts();
 ---
@@ -13,6 +15,7 @@ const posts = await getPosts();
   description="Backend notes — protocols, data paths, and the habits that keep systems honest."
 >
   <BlogBar />
+  {posts.length === 0 ? <PageMessage {...pageMessages.blogEmpty} /> : (
   <main class="blog-index">
     <div class="wrap blog-index__inner">
       <Reveal delay={70}><h1 class="blog-index__title">Notes from the wire.</h1></Reveal>
@@ -30,12 +33,13 @@ const posts = await getPosts();
       </Reveal>
 
       <div class="blog-index__list">
-        {posts.length > 0 ? posts.map((post, index) => (
+        {posts.map((post, index) => (
           <Reveal delay={Math.min(220 + index * 60, 480)}><BlogCard {post} {index} /></Reveal>
-        )) : <p class="blog-index__empty">Posts will appear here soon.</p>}
+        ))}
       </div>
     </div>
   </main>
+  )}
 </Layout>
 
 <style>
@@ -47,5 +51,4 @@ const posts = await getPosts();
   .blog-index__links a { color: var(--ink-muted); text-decoration: none; }
   .blog-index__links a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 0.2em; }
   .blog-index__list { margin-top: 3rem; }
-  .blog-index__empty { color: var(--ink-dim); }
 </style>

@@ -2,7 +2,7 @@
 /**
  * Toolkit — periodic-table-style stack grid (gorix-inspired).
  *
- *  - each tool is a cell: per-category ID, logo, lowercase name
+ *  - each tool is a cell: per-category ID, verified logo when available, name
  *    (no experience-years display — the per-category ID is the only number)
  *  - cells grouped by category into 3-col mini-grids with "// label" headers
  *  - filter row: gorix-style transparent text buttons with a sliding
@@ -34,6 +34,7 @@
  *    • hovering away does NOT close a toggled-open cell
  */
 import { toolGroups } from "../config/toolkit";
+import { technologies, type Technology } from "../config/technologies";
 import Section from "./primitives/Section.astro";
 import SectionLabel from "./primitives/SectionLabel.astro";
 import Reveal from "./primitives/Reveal.astro";
@@ -41,7 +42,7 @@ import TechIcon from "./icons/TechIcon.astro";
 
 const filters = [
   { id: "all", label: "all" },
-  ...toolGroups.map((g) => ({ id: g.id, label: g.label.replace("// ", "") })),
+  ...toolGroups.map((g) => ({ id: g.id, label: g.label })),
 ];
 const pad = (n: number) => String(n).padStart(2, "0");
 ---
@@ -93,21 +94,25 @@ const pad = (n: number) => String(n).padStart(2, "0");
         {
           toolGroups.map((group, groupIdx) => (
             <div data-group={group.id} class="transition-opacity [transition-duration:var(--transition)] opacity-100">
-              <p class="mb-3 inline-flex items-center gap-2 font-mono text-xs tracking-[0.16em] uppercase">
-                <span class="text-[var(--ink-muted)]">{group.label}</span>
+              <h3 class="mb-3 flex max-w-[228px] items-center gap-2 font-mono text-xs tracking-[0.12em] uppercase">
+                <span class="text-[var(--ink-muted)]">// {group.label}</span>
                 <span class="h-px w-6 bg-[var(--ink-dim)]/40" aria-hidden="true" />
                 <span class="text-[var(--ink-dim)]">{group.tools.length}</span>
-              </p>
+              </h3>
               <div class="group/tiles grid grid-cols-3 gap-1.5" style="grid-template-columns: repeat(3, 72px); grid-auto-rows: 72px;">
-                {group.tools.map((tool, idx) => {
+                {group.tools.map((toolId, idx) => {
+                  const tool: Technology = technologies[toolId];
                   const hasNote = !!tool.description;
                   return (
                     <div class={`group/cell relative ${hasNote ? "has-note" : ""}`} data-tk-cell>
                       <button
                         type="button"
                         data-cell={`${groupIdx}:${idx}`}
-                        aria-label={`${tool.name}${hasNote ? " — click to toggle notes" : ""}`}
+                        aria-label={`${tool.label}${hasNote ? " — click to toggle notes" : ""}`}
+                        title={tool.label}
                         aria-expanded={hasNote ? "false" : undefined}
+                        aria-controls={hasNote ? `tool-note-${toolId}` : undefined}
+                        aria-describedby={hasNote ? `tool-note-${toolId}` : undefined}
                         class="tk-cell relative flex h-[72px] w-[72px] flex-col justify-between overflow-hidden rounded-[9px] p-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
                       >
                         {/* per-category incrementing ID — top-left, zero-padded.
@@ -118,12 +123,14 @@ const pad = (n: number) => String(n).padStart(2, "0");
                         {/* logo — center. The colored TechIcon is the ONE
                             exception to gorix's monochrome chrome. */}
                         <span class="flex w-full flex-1 items-center justify-center">
-                          <TechIcon icon={tool.icon} brand={tool.brand} size={20} />
+                          {tool.icon ? <TechIcon technology={toolId} size={20} /> : (
+                            <span class="w-full break-words text-center font-sans text-[11px] leading-tight text-[var(--ink-muted)]">{tool.label}</span>
+                          )}
                         </span>
-                        {/* name — bottom, sans lowercase */}
-                        <span class="w-full truncate text-center font-sans text-[11px] leading-none lowercase text-[var(--ink-muted)]">
-                          {tool.name}
-                        </span>
+                        {/* Tools without verified artwork use their full name. */}
+                        {tool.icon && <span class="line-clamp-2 w-full text-center font-sans text-[11px] leading-tight text-[var(--ink-muted)]">
+                          {tool.label}
+                        </span>}
                         {/* has-note indicator — tiny amber dot, top-right.
                             Grows + glows brighter when the cell is open. */}
                         {hasNote && (
@@ -135,45 +142,36 @@ const pad = (n: number) => String(n).padStart(2, "0");
                         )}
                       </button>
 
-                      {/* hover/click-reveal note panel — appears directly
-                          BELOW the cell on hover OR when toggled open,
-                          aligned to the cell's LEFT edge (not centered) so
-                          it never overflows off the left of the viewport.
-                          pointer-events-none so it never steals the hover
-                          from the cell and never blocks neighbours.
-
-                          We do NOT use focus-within here — it is unreliable
-                          for the toggle-off path (the button can retain
-                          :focus-visible after a click). */}
+                      {/* Align notes to the three-column grid to stay inside narrow screens. */}
                       {hasNote && (
                         <div
                           role="tooltip"
-                          class="note-panel pointer-events-none absolute left-0 top-full z-40 mt-2 w-64 translate-y-1 opacity-0 transition-[opacity,transform] [transition-duration:240ms] [transition-timing-function:var(--ease)] group-hover/cell:translate-y-0 group-hover/cell:opacity-100 group-[.is-open]/cell:translate-y-0 group-[.is-open]/cell:opacity-100"
+                          id={`tool-note-${toolId}`}
+                          style={`left: ${-78 * (idx % 3)}px;`}
+                          class="note-panel pointer-events-none absolute top-full z-40 mt-2 w-[228px] translate-y-1 opacity-0 transition-[opacity,transform] [transition-duration:240ms] [transition-timing-function:var(--ease)] group-hover/cell:translate-y-0 group-hover/cell:opacity-100 group-[.is-open]/cell:translate-y-0 group-[.is-open]/cell:opacity-100"
                         >
                           <div
                             class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--glass-border-soft)] bg-[var(--glass-bg-strong)] p-3.5 backdrop-blur-xl"
                             style="box-shadow: var(--tk-panel-shadow), inset 0 1px 0 rgba(255,255,255,0.06);"
                           >
                             <div class="flex items-center gap-2">
-                              <TechIcon icon={tool.icon} brand={tool.brand} size={16} />
+                              <TechIcon technology={toolId} size={16} />
                               <span class="font-sans text-[0.88rem] font-medium text-[var(--ink)]">
-                                {tool.name}
+                                {tool.label}
                               </span>
                             </div>
                             <div
                               aria-hidden="true"
-                              class="mt-2 h-px w-full"
-                              style={`background: linear-gradient(90deg, ${tool.brand}55, transparent);`}
+                              class="mt-2 h-px w-full bg-[var(--line-strong)]"
                             />
                             <p class="mt-2 font-sans text-[0.84rem] leading-[1.6] text-[var(--ink-muted)]">
                               {tool.description}
                             </p>
                           </div>
-                          {/* arrow pointing UP at the cell — sits at the cell's
-                              horizontal center (left-9 = 36px = half of 72px). */}
                           <span
                             aria-hidden="true"
-                            class="absolute -top-1 left-9 h-2 w-2 -rotate-45 border-l border-t border-[var(--glass-border-soft)] bg-[var(--glass-bg-strong)]"
+                            style={`left: ${32 + 78 * (idx % 3)}px;`}
+                            class="absolute -top-1 h-2 w-2 -rotate-45 border-l border-t border-[var(--glass-border-soft)] bg-[var(--glass-bg-strong)]"
                           />
                         </div>
                       )}
