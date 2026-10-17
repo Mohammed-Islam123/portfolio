@@ -7,8 +7,7 @@ import { useTranslations } from "../config/i18n";
  *  - each tool is a cell: per-category ID, verified logo when available, name
  *    (no experience-years display — the per-category ID is the only number)
  *  - cells grouped by category into 3-col mini-grids with "// label" headers
- *  - filter row: gorix-style transparent text buttons with a sliding
- *    pill indicator that animates to the active filter
+ *  - square filter controls and a dashed frame that follows the selected group
  *  - spotlight hover: hovering one cell dims the rest (gorix-style)
  *  - brand color drives each cell's border (faint tint at rest, full
  *    color + glow on hover)
@@ -64,33 +63,21 @@ const pad = (n: number) => String(n).padStart(2, "0");
         <h2 class="sec-title mt-3">{t("what's in my toolstack")}</h2>
       </Reveal>
 
-      <!-- ── filter row — gorix-style sliding pill ────────────────
-           On mobile the filter buttons can wrap to 2 rows. The sliding
-           indicator only works on a single row (offsetLeft/offsetWidth
-           are row-relative), so the JS detects wrap and hides the
-           indicator; the active button then carries an inverted style. -->
       <Reveal delay={180}>
         <div class="mt-8 flex w-full justify-center">
           <div
-            class="filter-container relative inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-1.5 rounded-[12px] p-1.5 [scrollbar-width:none]"
+            class="inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-y-1"
           >
-            <!-- sliding indicator (absolute, behind buttons) — hidden when
-                 the row wraps (mobile). -->
-            <span
-              aria-hidden="true"
-              data-indicator
-              class="pointer-events-none absolute left-0 top-0 rounded-[8px] transition-[transform,width,height,top,opacity] [transition-duration:var(--transition)]"
-              style="transform: translateX(0px); width: 0px; height: 0px; opacity: 0;"
-            ></span>
             {
               filters.map((f, i) => (
                 <button
                   type="button"
                   data-filter={f.id}
-                  class="filter-btn relative z-10 shrink-0 rounded-[8px] px-3.5 py-1.5 font-mono text-xs tracking-[0.06em] text-[var(--ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+                  class="filter-btn flex min-h-[44px] min-w-[44px] items-center gap-2.5 rounded-[10px] px-3 py-2 font-sans text-xs tracking-[0.06em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
                   aria-pressed={i === 0 ? "true" : "false"}
                 >
-                  {f.label}
+                  <span class="filter-mark" aria-hidden="true"></span>
+                  <span>{f.label}</span>
                 </button>
               ))
             }
@@ -100,12 +87,13 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
       <!-- ── groups ───────────────────────────────────────────── -->
       <div
-        class="toolkit-groups mx-auto mt-10 flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-10 sm:gap-x-10"
+        class="toolkit-groups relative mx-auto mt-10 flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-10 p-3 sm:gap-x-10"
         data-groups
       >
+        <span class="group-indicator" data-group-indicator aria-hidden="true" style="opacity: 0;"></span>
         {
           toolGroups.map((group, groupIdx) => (
-            <div data-group={group.id} class="transition-opacity [transition-duration:var(--transition)] opacity-100">
+            <div data-group={group.id} class="relative z-10 transition-opacity duration-[450ms] [transition-timing-function:var(--ease)] opacity-100">
               <h3 class="mb-3 flex max-w-[228px] items-center gap-2 font-mono text-xs tracking-[0.12em] uppercase">
                 <span class="text-[var(--ink-muted)]">// {group.label}</span>
                 <span class="h-px w-6 bg-[var(--ink-dim)]/40" aria-hidden="true" />
@@ -207,7 +195,6 @@ const pad = (n: number) => String(n).padStart(2, "0");
     private cleanupFns: (() => void)[] = [];
     private filter = "all";
     private activeCell: string | null = null;
-    private ind = { x: 0, w: 0, ready: false };
 
     connectedCallback() {
       const events = new AbortController();
@@ -216,7 +203,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
       const filterBtns = Array.from(
         this.querySelectorAll<HTMLButtonElement>("[data-filter]"),
       );
-      const indicator = this.querySelector<HTMLElement>("[data-indicator]");
+      const indicator = this.querySelector<HTMLElement>("[data-group-indicator]")!;
       const groups = Array.from(this.querySelectorAll<HTMLElement>("[data-group]"));
       const cells = Array.from(this.querySelectorAll<HTMLButtonElement>("[data-cell]"));
       const mobile = window.matchMedia("(max-width: 767px)");
@@ -231,12 +218,6 @@ const pad = (n: number) => String(n).padStart(2, "0");
         filterBtns.forEach((btn) => {
           const isActive = btn.dataset.filter === this.filter;
           btn.setAttribute("aria-pressed", String(isActive));
-          // when the sliding indicator is hidden (mobile/wrapped), the
-          // active button itself carries the visual weight via an
-          // inverted style. When the indicator IS visible (desktop),
-          // keep it text-only so the indicator shows through behind.
-          btn.classList.toggle("f-active-inverted", isActive && !this.ind.ready);
-          btn.classList.toggle("f-active-text", isActive && this.ind.ready);
         });
         groups.forEach((g) => {
           const excluded = this.filter !== "all" && this.filter !== g.dataset.group;
@@ -247,26 +228,23 @@ const pad = (n: number) => String(n).padStart(2, "0");
         });
       };
 
-      // ── sliding active-indicator ─────────────────────────────────
+      const measureFrame = () => {
+        indicator.style.opacity = this.filter === "all" ? "0" : "1";
+        if (this.filter === "all") return;
+        const group = groups.find((g) => g.dataset.group === this.filter);
+        if (!group) return;
+        const start = getComputedStyle(groupsArea).direction === "rtl"
+          ? groupsArea.clientWidth - group.offsetLeft - group.offsetWidth
+          : group.offsetLeft;
+        indicator.style.insetInlineStart = `${start - 12}px`;
+        indicator.style.insetBlockStart = `${group.offsetTop - 12}px`;
+        indicator.style.inlineSize = `${group.offsetWidth + 24}px`;
+        indicator.style.blockSize = `${group.offsetHeight + 24}px`;
+      };
+
       const measure = () => {
-        const idx = filterBtns.findIndex((b) => b.dataset.filter === this.filter);
-        const el = filterBtns[idx];
-        const first = filterBtns[0];
-        if (el && first && indicator) {
-          // hide the indicator if the row has wrapped (mobile). We check
-          // if ANY button is in a different row than the first — not just
-          // the active one (otherwise "all" (first) active reads as
-          // unwrapped even when buttons HAVE wrapped to row 2).
-          const firstTop = first.offsetTop;
-          const wrapped = filterBtns.some((b) => b.offsetTop !== firstTop);
-          this.ind = { x: el.offsetLeft, w: el.offsetWidth, ready: !wrapped };
-          indicator.style.transform = `translateX(${this.ind.x}px)`;
-          indicator.style.top = `${el.offsetTop}px`;
-          indicator.style.width = `${this.ind.w}px`;
-          indicator.style.height = `${el.offsetHeight}px`;
-          indicator.style.opacity = this.ind.ready ? "1" : "0";
-        }
         renderFilters();
+        measureFrame();
       };
 
       const applyFilter = (id: string) => {
@@ -293,18 +271,22 @@ const pad = (n: number) => String(n).padStart(2, "0");
         }, { signal });
       });
 
-      window.addEventListener("resize", measure);
+      window.addEventListener("resize", measure, { signal });
       mobile.addEventListener("change", () => {
         closeActive();
         filterAnimation?.cancel();
         measure();
       }, { signal });
-      // re-measure once fonts/layout settle
-      const t = setTimeout(measure, 350);
-      this.cleanupFns.push(() => {
-        window.removeEventListener("resize", measure);
-        clearTimeout(t);
+      const observer = new ResizeObserver(measureFrame);
+      observer.observe(groupsArea);
+      groups.forEach((group) => observer.observe(group));
+      this.cleanupFns.push(() => observer.disconnect());
+      document.fonts.ready.then(() => {
+        if (!signal.aborted) measure();
       });
+      motion.addEventListener("change", () => {
+        if (motion.matches) filterAnimation?.cancel();
+      }, { signal });
 
       // ── cells: hover sound + click-to-toggle notes ───────────────
       const closeActive = () => {
@@ -397,11 +379,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
     grid-auto-rows: 72px;
   }
   @media (max-width: 767px) {
-    [data-filter] {
-      min-height: 44px;
-    }
     .toolkit-groups {
-      padding: 12px;
       flex-direction: column;
       flex-wrap: nowrap;
       align-items: center;
@@ -423,48 +401,78 @@ const pad = (n: number) => String(n).padStart(2, "0");
       pointer-events: auto;
     }
   }
-  .filter-container {
-    background: var(--filter-container-bg);
-    border: 1px solid var(--filter-container-border);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
   .filter-btn {
-    background: var(--filter-bg);
-    border: 1px solid var(--filter-border);
-    transition:
-      border-color var(--transition-fast),
-      background-color var(--transition-fast),
-      color var(--transition-fast);
+    color: color-mix(in srgb, var(--ink) 55%, transparent);
+    background: transparent;
+    transition: color 150ms var(--ease), transform 150ms var(--ease);
   }
   .filter-btn:hover {
+    color: color-mix(in srgb, var(--ink) 80%, transparent);
+  }
+  .filter-btn:active {
+    transform: translateY(1px);
+  }
+  .filter-mark {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    inline-size: 18px;
+    block-size: 18px;
+    border-radius: 6px;
+    border: 1px solid var(--filter-border);
+    background: var(--filter-bg);
+    box-shadow: inset 0 1px 2px var(--filter-inset);
+    transition:
+      border-color 150ms var(--ease),
+      background-color 150ms var(--ease),
+      box-shadow 150ms var(--ease);
+  }
+  .filter-btn:hover .filter-mark {
     border-color: var(--filter-border-hover);
-    background: var(--filter-bg-hover);
+  }
+  .filter-mark::after {
+    content: "";
+    inline-size: 6px;
+    block-size: 6px;
+    border-radius: 2px;
+    background: var(--bg);
+    transform: scale(0);
+    transition: transform 150ms var(--ease);
+  }
+  .filter-btn[aria-pressed="true"] {
     color: var(--ink);
   }
-  [data-indicator] {
-    background: var(--surface-3);
-    border: 1px solid var(--line-strong);
+  .filter-btn[aria-pressed="true"] .filter-mark {
+    border-color: color-mix(in srgb, var(--ink) 30%, transparent);
+    background: var(--ink);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.65), inset 0 -2px 0 rgb(0 0 0 / 0.22);
+  }
+  .filter-btn[aria-pressed="true"] .filter-mark::after {
+    transform: scale(1);
+  }
+  .group-indicator {
+    pointer-events: none;
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: 0;
+    border: 2px dashed color-mix(in srgb, var(--ink) 20%, transparent);
+    background: color-mix(in srgb, var(--ink) 2%, transparent);
+    border-radius: 21px;
+    transition:
+      inset-inline-start 450ms var(--ease),
+      inset-block-start 450ms var(--ease),
+      inline-size 450ms var(--ease),
+      block-size 450ms var(--ease),
+      opacity 450ms var(--ease);
   }
   @media (prefers-reduced-motion: reduce) {
     .note-panel,
     .filter-btn,
-    [data-indicator] {
+    .filter-mark,
+    .filter-mark::after,
+    .group-indicator,
+    [data-group] {
       transition: none !important;
     }
-  }
-  /* active filter button states (toggled by JS based on indicator
-     readiness — see renderFilters) */
-  .f-active-text {
-    border-color: transparent !important;
-    background: transparent !important;
-    color: var(--ink) !important;
-    font-weight: 500;
-  }
-  .f-active-inverted {
-    background: var(--ink) !important;
-    color: var(--bg) !important;
-    border-color: var(--ink) !important;
-    font-weight: 500;
   }
 </style>

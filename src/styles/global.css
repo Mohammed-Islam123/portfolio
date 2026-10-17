@@ -61,13 +61,11 @@
   --tk-ring-hover:    rgb(255 255 255 / 0.06);
   --tk-panel-shadow:  0 12px 40px -12px rgba(0,0,0,0.7);
 
-  /* ── toolkit filter chrome (clearly visible subtle borders & surface) ── */
-  --filter-border:            rgb(255 255 255 / 0.16);
-  --filter-bg:                rgb(255 255 255 / 0.04);
-  --filter-border-hover:      rgb(255 255 255 / 0.35);
-  --filter-bg-hover:          rgb(255 255 255 / 0.08);
-  --filter-container-border:  rgb(255 255 255 / 0.10);
-  --filter-container-bg:      rgb(255 255 255 / 0.02);
+  /* Toolkit filter controls. */
+  --filter-border:        rgb(255 255 255 / 0.20);
+  --filter-bg:            rgb(255 255 255 / 0.06);
+  --filter-border-hover:  rgb(255 255 255 / 0.40);
+  --filter-inset:         rgb(0 0 0 / 0.45);
 
   /* ── signal (RETAINED ONLY for semantic status + a11y focus) ─────── */
   /*  The reference site is 100% monochrome. We keep a single thread of
@@ -206,13 +204,11 @@ html.light {
   --tk-ring-hover:    rgb(20 20 15 / 0.10);
   --tk-panel-shadow:  0 12px 40px -12px rgba(0,0,0,0.18);
 
-  /* ── toolkit filter chrome (clearly visible subtle borders & surface) ── */
-  --filter-border:            rgb(20 20 15 / 0.18);
-  --filter-bg:                rgb(255 255 255 / 0.75);
-  --filter-border-hover:      rgb(20 20 15 / 0.45);
-  --filter-bg-hover:          rgb(20 20 15 / 0.06);
-  --filter-container-border:  rgb(20 20 15 / 0.12);
-  --filter-container-bg:      rgb(20 20 15 / 0.03);
+  /* Toolkit filter controls. */
+  --filter-border:        rgb(20 20 15 / 0.20);
+  --filter-bg:            rgb(20 20 15 / 0.06);
+  --filter-border-hover:  rgb(20 20 15 / 0.40);
+  --filter-inset:         rgb(20 20 15 / 0.12);
 
   /* signal (kept identical — semantic status + a11y focus) */
   --signal:      #C77700;   /* slightly darker amber so it reads on paper  */
