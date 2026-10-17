@@ -833,14 +833,14 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
   white-space: pre-line;
 }
 
-/* On touch devices, hide the custom cursor entirely — native cursor
-   (or no cursor on touch) is the right UX. The JS guard already prevents
-   mounting, but this is a belt-and-suspenders CSS safety net. */
-@media (pointer: coarse) {
+/* On touch-only devices, hide the custom cursor entirely — native cursor
+   (or no cursor on touch) is the right UX. Devices with a mouse or touchpad
+   retain the custom cursor layers. */
+@media (pointer: coarse) and (not (any-pointer: fine)) {
   .c-dot,
   .c-ring,
   .c-drag-label {
-    display: none;
+    display: none !important;
   }
 }
 
