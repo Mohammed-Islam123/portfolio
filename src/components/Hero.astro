@@ -35,6 +35,7 @@ import DotField from "./DotField.astro";
 import Greeting from "./Greeting.astro";
 import ScrambleName from "./ScrambleName.astro";
 import HeroJourney from "./HeroJourney.astro";
+import CvDropdown from "./CvDropdown.astro";
 
 const locale = localeFromPath(Astro.url.pathname);
 const t = useTranslations(locale);
@@ -163,42 +164,19 @@ const siteConfig = getSiteConfig(locale);
           centered column up (the section is justify-center) so there's
           a comfortable gap between the buttons and the absolute scroll
           cue at the bottom. -->
-      <div class="hero-gated mt-8 mb-16 flex flex-wrap items-center justify-center gap-3 hf-800-600">
-        <a
-          href={siteConfig.cvUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="group/cv inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--surface-2)] px-5 py-2.5 font-mono text-xs tracking-[0.06em] text-[var(--ink)] transition-[transform,border-color,background-color] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 hover:border-[var(--ink-muted)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
-        >
-          <!-- download icon (lucide "download", inlined) -->
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-            class="text-[var(--ink-muted)] transition-transform [transition-duration:var(--transition-fast)] group-hover/cv:translate-y-0.5 group-hover/cv:text-[var(--ink)]"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-          <span>{t("download cv")}</span>
-        </a>
+      <div class="hero-gated mt-8 mb-16 flex flex-wrap items-center justify-center gap-3.5 hf-800-600">
+        <CvDropdown locale={locale} />
         <a
           href="#contact"
-          class="group/ct inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-5 py-2.5 font-mono text-xs tracking-[0.06em] text-[var(--bg)] transition-[transform,box-shadow] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
-          style="background: var(--ink); box-shadow: 0 6px 20px -8px rgba(255,255,255,0.30);"
+          class="hero-cta-contact group/ct inline-flex min-h-[44px] items-center gap-2.5 rounded-[var(--radius-sm)] px-6 py-3 font-mono text-sm tracking-[0.06em] transition-all [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+          data-sound-hover
+          data-sound-click
         >
           <span>{t("contact")}</span>
-          <!-- arrow-down icon (lucide "arrow-down", inlined) -->
+          <!-- arrow-down icon (lucide "arrow-down", 16x16) -->
           <svg
-            width="14"
-            height="14"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -236,6 +214,8 @@ const siteConfig = getSiteConfig(locale);
 </hero-section>
 
 <script>
+  import { playSound } from "../scripts/sound-init";
+
   /** live clock (HH:MM:SS in the site timezone), paused when the tab
    *  is hidden. Placeholder "--:--:--" in static HTML; first tick on
    *  the next animation frame after connect. */
@@ -280,6 +260,18 @@ const siteConfig = getSiteConfig(locale);
       this.cleanupFns.push(() => {
         window.removeEventListener("loader:dismiss", reveal);
         clearTimeout(safety);
+      });
+
+      // Sound feedback for hero interactive elements
+      this.querySelectorAll<HTMLElement>("[data-sound-hover]").forEach((el) => {
+        const onHover = () => playSound("hover");
+        el.addEventListener("mouseenter", onHover);
+        this.cleanupFns.push(() => el.removeEventListener("mouseenter", onHover));
+      });
+      this.querySelectorAll<HTMLElement>("[data-sound-click]").forEach((el) => {
+        const onClick = () => playSound("click");
+        el.addEventListener("click", onClick);
+        this.cleanupFns.push(() => el.removeEventListener("click", onClick));
       });
 
       // ── live clock ───────────────────────────────────────────────
@@ -337,6 +329,22 @@ const siteConfig = getSiteConfig(locale);
       rgba(var(--scrim-color), 0.90) 64%,
       var(--bg) 100%
     );
+  }
+
+  /* Hero CTA Contact button styling with theme-aware elevation */
+  .hero-cta-contact {
+    background: var(--ink);
+    color: var(--bg);
+    box-shadow: 0 6px 20px -8px rgba(255, 255, 255, 0.30);
+  }
+  :global(html.light) .hero-cta-contact {
+    box-shadow: 0 6px 20px -8px rgba(0, 0, 0, 0.25);
+  }
+  .hero-cta-contact:hover {
+    box-shadow: 0 8px 24px -6px rgba(255, 255, 255, 0.38);
+  }
+  :global(html.light) .hero-cta-contact:hover {
+    box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.35);
   }
 
   @keyframes hero-fade {

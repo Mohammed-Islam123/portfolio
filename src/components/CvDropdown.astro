@@ -1,0 +1,273 @@
+---
+/**
+ * CvDropdown — Multi-language CV download dropdown.
+ * Simplified single-line version labels (e.g. English Version, French Version, Arabic Version)
+ * with auto-flip placement (opens top when space below is limited).
+ * Meets 44x44px touch target minimums, CSS logical properties, and reduced-motion guidelines.
+ */
+import { getSiteConfig } from "../config/site";
+import { useTranslations } from "../config/i18n";
+import UiIcon from "./icons/UiIcon.astro";
+import type { Locale } from "../lib/i18n";
+
+interface Props {
+  locale: Locale;
+  class?: string;
+}
+
+const { locale, class: className = "" } = Astro.props;
+const t = useTranslations(locale);
+const siteConfig = getSiteConfig(locale);
+const menuId = `cv-menu-${crypto.randomUUID().slice(0, 8)}`;
+---
+
+<cv-dropdown class:list={["cv-dropdown relative inline-block", className]}>
+  <button
+    type="button"
+    class="cv-trigger group/cv inline-flex min-h-[44px] items-center gap-2.5 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--surface-2)] px-6 py-3 font-mono text-sm tracking-[0.06em] text-[var(--ink)] transition-all [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 hover:border-[var(--ink-muted)] hover:bg-[var(--surface-3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+    data-cv-trigger
+    data-sound-hover
+    data-sound-click
+    aria-haspopup="menu"
+    aria-expanded="false"
+    aria-controls={menuId}
+    aria-label={t("download cv")}
+  >
+    <UiIcon
+      name="download"
+      size={16}
+      class="text-[var(--ink-muted)] transition-transform [transition-duration:var(--transition-fast)] group-hover/cv:translate-y-0.5 group-hover/cv:text-[var(--ink)]"
+    />
+    <span>{t("download cv")}</span>
+    <UiIcon
+      name="chevron-down"
+      size={14}
+      class="cv-chevron text-[var(--ink-muted)] transition-transform [transition-duration:var(--transition-fast)] group-hover/cv:text-[var(--ink)]"
+    />
+  </button>
+
+  <ul
+    id={menuId}
+    class="cv-menu absolute start-1/2 z-50 min-w-[210px] max-w-[calc(100vw-2rem)] -translate-x-1/2 space-y-1 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--surface-3)] p-1.5 backdrop-blur-xl"
+    data-cv-menu
+    role="menu"
+    aria-label={t("Choose CV language")}
+    hidden
+  >
+    {
+      siteConfig.cvVersions.map((version) => (
+        <li role="none">
+          <a
+            href={version.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            role="menuitem"
+            data-cv-item
+            data-sound-hover
+            data-sound-click
+            class="cv-menu-item group/item flex min-h-[44px] items-center justify-between gap-4 rounded-[6px] px-3.5 py-2.5 font-mono text-xs tracking-wider text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+          >
+            <span>{version.label}</span>
+            <UiIcon
+              name="arrow-up-right"
+              size={14}
+              class="shrink-0 text-[var(--ink-dim)] transition-all [transition-duration:var(--transition-fast)] group-hover/item:translate-x-0.5 group-hover/item:text-[var(--ink)]"
+            />
+          </a>
+        </li>
+      ))
+    }
+  </ul>
+</cv-dropdown>
+
+<script>
+  import { playSound } from "../scripts/sound-init";
+
+  class CvDropdownEl extends HTMLElement {
+    private events: AbortController | null = null;
+
+    private updatePlacement() {
+      const trigger = this.querySelector<HTMLButtonElement>("[data-cv-trigger]");
+      const menu = this.querySelector<HTMLElement>("[data-cv-menu]");
+      if (!trigger || !menu || menu.hidden) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const menuHeight = menu.offsetHeight || 150;
+      const spaceBelow = window.innerHeight - triggerRect.bottom;
+      const spaceAbove = triggerRect.top;
+
+      // If there is insufficient room below and more room above, flip on top
+      if (spaceBelow < menuHeight + 16 && spaceAbove > spaceBelow) {
+        this.setAttribute("data-placement", "top");
+      } else {
+        this.setAttribute("data-placement", "bottom");
+      }
+    }
+
+    public setOpen(open: boolean, focusFirst = false) {
+      const trigger = this.querySelector<HTMLButtonElement>("[data-cv-trigger]");
+      const menu = this.querySelector<HTMLElement>("[data-cv-menu]");
+      if (!trigger || !menu) return;
+
+      if (open) {
+        menu.hidden = false;
+        trigger.setAttribute("aria-expanded", "true");
+        this.updatePlacement();
+        if (focusFirst) {
+          const firstItem = menu.querySelector<HTMLAnchorElement>("[data-cv-item]");
+          firstItem?.focus();
+        }
+      } else {
+        menu.hidden = true;
+        trigger.setAttribute("aria-expanded", "false");
+      }
+    }
+
+    connectedCallback() {
+      this.events?.abort();
+      this.events = new AbortController();
+      const { signal } = this.events;
+
+      const trigger = this.querySelector<HTMLButtonElement>("[data-cv-trigger]");
+      const menu = this.querySelector<HTMLElement>("[data-cv-menu]");
+      if (!trigger || !menu) return;
+
+      // Sound feedback
+      trigger.addEventListener("mouseenter", () => playSound("hover"), { signal });
+      this.querySelectorAll<HTMLAnchorElement>("[data-cv-item]").forEach((item) => {
+        item.addEventListener("mouseenter", () => playSound("hover"), { signal });
+        item.addEventListener("click", () => {
+          playSound("click");
+          this.setOpen(false);
+        }, { signal });
+      });
+
+      // Toggle menu on button click
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        playSound("click");
+        const isOpen = trigger.getAttribute("aria-expanded") === "true";
+        this.setOpen(!isOpen, false);
+      }, { signal });
+
+      // Close on outside click
+      document.addEventListener("pointerdown", (e) => {
+        if (!this.contains(e.target as Node)) {
+          this.setOpen(false);
+        }
+      }, { signal });
+
+      // Re-evaluate placement on scroll or resize while open
+      window.addEventListener("scroll", () => this.updatePlacement(), { signal, passive: true });
+      window.addEventListener("resize", () => this.updatePlacement(), { signal, passive: true });
+
+      // Keyboard navigation
+      this.addEventListener("keydown", (e) => {
+        if (menu.hidden) {
+          if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+            if (document.activeElement === trigger) {
+              e.preventDefault();
+              this.setOpen(true, true);
+            }
+          }
+          return;
+        }
+
+        if (e.key === "Escape") {
+          e.preventDefault();
+          this.setOpen(false);
+          trigger.focus();
+          return;
+        }
+
+        const items = Array.from(this.querySelectorAll<HTMLAnchorElement>("[data-cv-item]"));
+        if (!items.length) return;
+        const currentIndex = items.indexOf(document.activeElement as HTMLAnchorElement);
+
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % items.length;
+          items[nextIndex]?.focus();
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          const prevIndex = currentIndex === -1 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+          items[prevIndex]?.focus();
+        } else if (e.key === "Tab") {
+          this.setOpen(false);
+        }
+      }, { signal });
+    }
+
+    disconnectedCallback() {
+      this.events?.abort();
+      this.events = null;
+    }
+  }
+
+  if (!customElements.get("cv-dropdown")) {
+    customElements.define("cv-dropdown", CvDropdownEl);
+  }
+</script>
+
+<style>
+  .cv-menu {
+    box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.55), 0 6px 16px -4px rgba(0, 0, 0, 0.35);
+  }
+  :global(html.light) .cv-menu {
+    background: var(--surface);
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.15), 0 4px 12px -2px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Default bottom placement */
+  .cv-dropdown:not([data-placement="top"]) .cv-menu {
+    top: calc(100% + 0.5rem);
+    bottom: auto;
+  }
+  .cv-dropdown:not([data-placement="top"]) .cv-menu:not([hidden]) {
+    animation: cv-menu-in-bottom 140ms var(--ease) both;
+  }
+
+  /* Top placement when space below is limited */
+  .cv-dropdown[data-placement="top"] .cv-menu {
+    bottom: calc(100% + 0.5rem);
+    top: auto;
+  }
+  .cv-dropdown[data-placement="top"] .cv-menu:not([hidden]) {
+    animation: cv-menu-in-top 140ms var(--ease) both;
+  }
+
+  .cv-trigger[aria-expanded="true"] .cv-chevron {
+    transform: rotate(180deg);
+  }
+
+  @keyframes cv-menu-in-bottom {
+    from {
+      opacity: 0;
+      transform: translate(-50%, -6px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  }
+
+  @keyframes cv-menu-in-top {
+    from {
+      opacity: 0;
+      transform: translate(-50%, 6px);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cv-menu:not([hidden]) {
+      animation: none;
+    }
+    .cv-trigger[aria-expanded="true"] .cv-chevron {
+      transition: none;
+    }
+  }
+</style>

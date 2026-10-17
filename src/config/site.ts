@@ -45,8 +45,26 @@ export const siteConfig = {
     available: true,
   },
   email: contactEmail,
-  /** CV download link. */
-  cvUrl: "https://drive.google.com/file/d/1UNMNZX2Nvq2WVbXTT--Py-Vqx3dXQSv8/view?usp=drive_link",
+  /** CV download link (fallback default). */
+  cvUrl: "https://drive.google.com/file/d/1OCHshP7_AzqbUmh7aO0TILqjLTiscK8i/view?usp=drive_link",
+  /** CV download links by language */
+  cvVersions: [
+    {
+      id: "en",
+      label: "English Version",
+      url: "https://drive.google.com/file/d/1OCHshP7_AzqbUmh7aO0TILqjLTiscK8i/view?usp=drive_link",
+    },
+    {
+      id: "fr",
+      label: "French Version",
+      url: "https://drive.google.com/file/d/111GwxHHjCAlrPzsKJZMRMxYuKdpP2RyY/view?usp=drive_link",
+    },
+    {
+      id: "ar",
+      label: "Arabic Version",
+      url: "https://drive.google.com/file/d/13EhGSVlEsrOL5AY791uPD9r03l7wpKvY/view?usp=drive_link",
+    },
+  ],
   contactCopy: {
     headline: "if you've made it this far,",
     action: "Say hi",
@@ -125,6 +143,10 @@ export function getSiteConfig(locale: Locale) {
     role: t(siteConfig.role),
     roleKeywords: t(siteConfig.roleKeywords),
     status: { ...siteConfig.status, label: t(siteConfig.status.label) },
+    cvVersions: siteConfig.cvVersions.map((cv) => ({
+      ...cv,
+      label: t(cv.label),
+    })),
     contactCopy: { headline: t(siteConfig.contactCopy.headline), action: t(siteConfig.contactCopy.action), profiles: t(siteConfig.contactCopy.profiles) },
     contactPlatforms: siteConfig.contactPlatforms.map((platform) => ({ ...platform, label: t(platform.label), href: platform.id === "email" ? emailHref : platform.id === "whatsapp" ? `https://wa.me/213794839435?text=${encodeURIComponent(t(contactMessageTemplate))}` : platform.href })),
     socialProfiles: siteConfig.socialProfiles.map((profile) => ({ ...profile, label: t(profile.label), href: profile.href === "/" ? localizedPath(locale) : profile.href })),

@@ -14,6 +14,8 @@ export const french = {
   "open to work": "à l'écoute d'opportunités",
   "about": "à propos", "projects": "projets", "toolkit": "outils", "contact": "contact",
   "I am": "Je suis", "download cv": "voir mon CV", "Download CV": "Voir mon CV",
+  "English Version": "Version anglaise", "French Version": "Version française", "Arabic Version": "Version arabe",
+  "Choose CV language": "Choisir la langue du CV",
   "I’m a backend-focused software engineer. I build APIs and services primarily with C# and .NET, and use other languages and technologies when a project needs them. I’m particularly interested in system design, databases, and real-time communication. Outside of software development work, I enjoy working on IoT and robotics projects.": "Je suis ingénieur logiciel, spécialisé en backend. Je développe des API et des services principalement avec C# et .NET, et j'utilise d'autres langages et technologies selon les besoins des projets. Je m'intéresse particulièrement à la conception de systèmes, aux bases de données et à la communication en temps réel. En dehors du développement logiciel, j'aime aussi concevoir des projets en IoT et en robotique.",
   "Mohamed Islam Benyahkem at a technology event": "Mohamed Islam Benyahkem lors d'un événement technologique",
   "Portrait of Mohamed Islam Benyahkem": "Portrait de Mohamed Islam Benyahkem",

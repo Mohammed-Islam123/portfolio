@@ -13,6 +13,8 @@ export const UI_ICONS: Record<string, string> = {
   "arrow-right": `<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>`,
   "arrow-left": `<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>`,
   "arrow-up": `<path d="m18 15-6-6-6 6"/>`,
+  "arrow-down": `<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>`,
+  download: `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`,
   "chevron-right": `<path d="m9 18 6-6-6-6"/>`,
   "chevron-down": `<path d="m6 9 6 6 6-6"/>`,
   list: `<path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/>`,
