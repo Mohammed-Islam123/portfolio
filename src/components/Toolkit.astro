@@ -70,35 +70,37 @@ const pad = (n: number) => String(n).padStart(2, "0");
            are row-relative), so the JS detects wrap and hides the
            indicator; the active button then carries an inverted style. -->
       <Reveal delay={180}>
-        <div
-          class="relative mt-8 inline-flex max-w-full flex-wrap gap-1 rounded-[10px] border border-[var(--line-soft)] bg-[var(--bg)]/40 p-1 backdrop-blur-xl [scrollbar-width:none]"
-        >
-          <!-- sliding indicator (absolute, behind buttons) — hidden when
-               the row wraps (mobile). -->
-          <span
-            aria-hidden="true"
-            data-indicator
-            class="pointer-events-none absolute left-0 top-0 h-[calc(100%-0.5rem)] rounded-[10px] bg-[var(--surface-3)] transition-[transform,width,opacity] [transition-duration:var(--transition)]"
-            style="transform: translateX(0px); width: 0px; opacity: 0; margin-top: 2px;"
-          ></span>
-          {
-            filters.map((f, i) => (
-              <button
-                type="button"
-                data-filter={f.id}
-                class="relative z-10 shrink-0 rounded-[8px] px-3.5 py-1.5 font-mono text-xs tracking-[0.08em] transition-colors [transition-duration:var(--transition-fast)] text-[var(--ink-muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
-                aria-pressed={i === 0 ? "true" : "false"}
-              >
-                {f.label}
-              </button>
-            ))
-          }
+        <div class="mt-8 flex w-full justify-center">
+          <div
+            class="filter-container relative inline-flex w-fit max-w-full flex-wrap items-center justify-center gap-1.5 rounded-[12px] p-1.5 [scrollbar-width:none]"
+          >
+            <!-- sliding indicator (absolute, behind buttons) — hidden when
+                 the row wraps (mobile). -->
+            <span
+              aria-hidden="true"
+              data-indicator
+              class="pointer-events-none absolute left-0 top-0 rounded-[8px] transition-[transform,width,height,top,opacity] [transition-duration:var(--transition)]"
+              style="transform: translateX(0px); width: 0px; height: 0px; opacity: 0;"
+            ></span>
+            {
+              filters.map((f, i) => (
+                <button
+                  type="button"
+                  data-filter={f.id}
+                  class="filter-btn relative z-10 shrink-0 rounded-[8px] px-3.5 py-1.5 font-mono text-xs tracking-[0.06em] text-[var(--ink-muted)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+                  aria-pressed={i === 0 ? "true" : "false"}
+                >
+                  {f.label}
+                </button>
+              ))
+            }
+          </div>
         </div>
       </Reveal>
 
       <!-- ── groups ───────────────────────────────────────────── -->
       <div
-        class="toolkit-groups mt-10 flex flex-wrap gap-x-10 gap-y-8"
+        class="toolkit-groups mx-auto mt-10 flex max-w-6xl flex-wrap justify-center gap-x-8 gap-y-10 sm:gap-x-10"
         data-groups
       >
         {
@@ -124,7 +126,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
                         aria-expanded={hasNote ? "false" : undefined}
                         aria-controls={hasNote ? `tool-note-${toolId}` : undefined}
                         aria-describedby={hasNote ? `tool-note-${toolId}` : undefined}
-                        class="tk-cell relative flex h-[72px] w-[72px] flex-col justify-between overflow-hidden rounded-[9px] p-1.5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+                        class="tk-cell relative flex h-[72px] w-[72px] flex-col justify-between overflow-hidden rounded-[9px] p-1.5 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
                       >
                         {/* per-category incrementing ID — top-left, zero-padded.
                             The only number on the cell. */}
@@ -147,7 +149,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
                         {hasNote && (
                           <span
                             aria-hidden="true"
-                            class="tk-note-dot absolute right-1 top-1 h-1 w-1 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]"
+                            class="tk-note-dot absolute end-1 top-1 h-1 w-1 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]"
                             style="box-shadow: 0 0 6px var(--signal-glow);"
                           />
                         )}
@@ -259,7 +261,9 @@ const pad = (n: number) => String(n).padStart(2, "0");
           const wrapped = filterBtns.some((b) => b.offsetTop !== firstTop);
           this.ind = { x: el.offsetLeft, w: el.offsetWidth, ready: !wrapped };
           indicator.style.transform = `translateX(${this.ind.x}px)`;
+          indicator.style.top = `${el.offsetTop}px`;
           indicator.style.width = `${this.ind.w}px`;
+          indicator.style.height = `${el.offsetHeight}px`;
           indicator.style.opacity = this.ind.ready ? "1" : "0";
         }
         renderFilters();
@@ -314,7 +318,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
         const dot = prev?.querySelector<HTMLElement>(".tk-note-dot");
         if (dot) {
           dot.className =
-            "tk-note-dot absolute right-1 top-1 h-1 w-1 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]";
+            "tk-note-dot absolute end-1 top-1 h-1 w-1 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]";
           dot.setAttribute(
             "style",
             "box-shadow: 0 0 6px var(--signal-glow);",
@@ -337,7 +341,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
         const dot = cell?.querySelector<HTMLElement>(".tk-note-dot");
         if (dot) {
           dot.className =
-            "tk-note-dot absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]";
+            "tk-note-dot absolute end-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--signal)] transition-[box-shadow] [transition-duration:var(--transition-fast)]";
           dot.setAttribute(
             "style",
             "box-shadow: 0 0 10px var(--signal-glow), 0 0 4px var(--signal);",
@@ -419,18 +423,48 @@ const pad = (n: number) => String(n).padStart(2, "0");
       pointer-events: auto;
     }
   }
+  .filter-container {
+    background: var(--filter-container-bg);
+    border: 1px solid var(--filter-container-border);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  .filter-btn {
+    background: var(--filter-bg);
+    border: 1px solid var(--filter-border);
+    transition:
+      border-color var(--transition-fast),
+      background-color var(--transition-fast),
+      color var(--transition-fast);
+  }
+  .filter-btn:hover {
+    border-color: var(--filter-border-hover);
+    background: var(--filter-bg-hover);
+    color: var(--ink);
+  }
+  [data-indicator] {
+    background: var(--surface-3);
+    border: 1px solid var(--line-strong);
+  }
   @media (prefers-reduced-motion: reduce) {
-    .note-panel {
-      transition: none;
+    .note-panel,
+    .filter-btn,
+    [data-indicator] {
+      transition: none !important;
     }
   }
   /* active filter button states (toggled by JS based on indicator
      readiness — see renderFilters) */
   .f-active-text {
-    color: var(--ink);
+    border-color: transparent !important;
+    background: transparent !important;
+    color: var(--ink) !important;
+    font-weight: 500;
   }
   .f-active-inverted {
-    background: var(--ink);
-    color: var(--bg);
+    background: var(--ink) !important;
+    color: var(--bg) !important;
+    border-color: var(--ink) !important;
+    font-weight: 500;
   }
 </style>
