@@ -51,16 +51,19 @@ export const siteConfig = {
   cvVersions: [
     {
       id: "en",
+      code: "EN",
       label: "English Version",
       url: "https://drive.google.com/file/d/1OCHshP7_AzqbUmh7aO0TILqjLTiscK8i/view?usp=drive_link",
     },
     {
       id: "fr",
+      code: "FR",
       label: "French Version",
       url: "https://drive.google.com/file/d/111GwxHHjCAlrPzsKJZMRMxYuKdpP2RyY/view?usp=drive_link",
     },
     {
       id: "ar",
+      code: "AR",
       label: "Arabic Version",
       url: "https://drive.google.com/file/d/13EhGSVlEsrOL5AY791uPD9r03l7wpKvY/view?usp=drive_link",
     },

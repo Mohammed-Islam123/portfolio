@@ -48,7 +48,7 @@ const menuId = `cv-menu-${crypto.randomUUID().slice(0, 8)}`;
 
   <ul
     id={menuId}
-    class="cv-menu absolute start-1/2 z-50 min-w-[210px] max-w-[calc(100vw-2rem)] -translate-x-1/2 space-y-1 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--surface-3)] p-1.5 backdrop-blur-xl"
+    class="cv-menu absolute start-1/2 z-50 min-w-[225px] max-w-[calc(100vw-2rem)] -translate-x-1/2 space-y-1 rounded-[var(--radius-sm)] border border-[var(--line-strong)] bg-[var(--surface-3)] p-1.5 backdrop-blur-xl"
     data-cv-menu
     role="menu"
     aria-label={t("Choose CV language")}
@@ -65,9 +65,19 @@ const menuId = `cv-menu-${crypto.randomUUID().slice(0, 8)}`;
             data-cv-item
             data-sound-hover
             data-sound-click
-            class="cv-menu-item group/item flex min-h-[44px] items-center justify-between gap-4 rounded-[6px] px-3.5 py-2.5 font-mono text-xs tracking-wider text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
+            class="cv-menu-item group/item flex min-h-[44px] items-center justify-between gap-3 rounded-[6px] px-3 py-2 text-start transition-colors [transition-duration:var(--transition-fast)] hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
           >
-            <span>{version.label}</span>
+            <div class="flex items-center gap-2.5">
+              <span
+                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] border border-[var(--line-strong)] bg-[var(--surface)] font-mono text-[10px] font-semibold tracking-wider text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] group-hover/item:border-[var(--ink-muted)] group-hover/item:text-[var(--ink)]"
+                aria-hidden="true"
+              >
+                {version.code}
+              </span>
+              <span class="font-mono text-xs tracking-wider text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] group-hover/item:text-[var(--ink)]">
+                {version.label}
+              </span>
+            </div>
             <UiIcon
               name="arrow-up-right"
               size={14}
