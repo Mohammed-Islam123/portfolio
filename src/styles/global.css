@@ -53,8 +53,8 @@
       Kept as explicit vars (not var(--line)) so the hover inset/ring can
       layer multiple white tints at different opacities the way gorix does.
       See .tk-cell rules below. */
-  --tk-border:        rgb(255 255 255 / 0.15);
-  --tk-bg:            rgb(255 255 255 / 0.04);
+  --tk-border:        rgb(255 255 255 / 0.18);
+  --tk-bg:            rgb(255 255 255 / 0.05);
   --tk-border-hover:  rgb(255 255 255 / 0.30);
   --tk-bg-hover:      rgb(255 255 255 / 0.08);
   --tk-inset-hover:   rgb(255 255 255 / 0.22);
@@ -190,8 +190,8 @@ html.light {
       Opacities are tuned to match the *perceived* weight of the dark-mode
       white tints, not the raw alpha — dark strokes read heavier than
       light strokes at the same alpha, so we dial them back slightly. */
-  --tk-border:        rgb(20 20 15 / 0.22);
-  --tk-bg:            rgb(20 20 15 / 0.025);
+  --tk-border:        rgb(20 20 15 / 0.25);
+  --tk-bg:            rgb(20 20 15 / 0.03);
   --tk-border-hover:  rgb(20 20 15 / 0.50);
   --tk-bg-hover:      rgb(20 20 15 / 0.05);
   --tk-inset-hover:   rgb(20 20 15 / 0.14);
