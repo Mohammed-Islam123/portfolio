@@ -1,24 +1,31 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 import UiIcon from "./icons/UiIcon.astro";
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <article-tools>
-  <button class="article-back-to-top" type="button" data-back-to-top aria-label="Back to top" hidden>
+  <button class="article-back-to-top" type="button" data-back-to-top aria-label={t("Back to top")} hidden>
     <UiIcon name="arrow-up" size={18} />
-    <span class="sr-only">Back to top</span>
+    <span class="sr-only">{t("Back to top")}</span>
   </button>
 
   <template data-copy-idle>
     <span aria-hidden="true"><UiIcon name="copy" size={14} /></span>
-    <span class="sr-only">Copy code</span>
+    <span class="sr-only">{t("Copy code")}</span>
   </template>
   <template data-copy-success>
     <span aria-hidden="true"><UiIcon name="shield-check" size={14} /></span>
-    <span class="sr-only">Code copied</span>
+    <span class="sr-only">{t("Code copied")}</span>
   </template>
 </article-tools>
 
 <script>
+  import { useTranslations } from "../config/i18n";
+  const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   class ArticleTools extends HTMLElement {
     private abort?: AbortController;
     private frame = 0;
@@ -77,7 +84,7 @@ import UiIcon from "./icons/UiIcon.astro";
           button.type = "button";
           button.className = "article-code-copy";
           button.dataset.copyCode = "";
-          button.setAttribute("aria-label", "Copy code");
+          button.setAttribute("aria-label", t("Copy code"));
           wrapper.append(button);
         }
         this.renderCopyState(button, "idle");
@@ -95,7 +102,7 @@ import UiIcon from "./icons/UiIcon.astro";
         button.dataset.state = "copied";
       } catch {
         button.dataset.state = "failed";
-        button.setAttribute("aria-label", "Copy code unavailable");
+        button.setAttribute("aria-label", t("Copy code unavailable"));
       }
 
       window.clearTimeout(this.resetTimers.get(button));
@@ -113,7 +120,7 @@ import UiIcon from "./icons/UiIcon.astro";
       const template = this.querySelector<HTMLTemplateElement>(`[data-copy-${state}]`);
       if (!template) return;
       button.replaceChildren(template.content.cloneNode(true));
-      button.setAttribute("aria-label", state === "success" ? "Code copied" : "Copy code");
+      button.setAttribute("aria-label", state === "success" ? t("Code copied") : t("Copy code"));
     }
   }
 

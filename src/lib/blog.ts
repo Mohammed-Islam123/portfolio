@@ -3,6 +3,10 @@
  */
 import { getCollection, type CollectionEntry } from "astro:content";
 
+import { articleKey, selectArticles } from "./article-versions";
+import { localizedPath, type Locale } from "./i18n";
+export { articleKey } from "./article-versions";
+
 export type Post = CollectionEntry<"blog">;
 
 export type Tag = {
@@ -43,8 +47,8 @@ export function tagSlug(tag: string): string {
   return slug;
 }
 
-export function formatDate(d: Date): string {
-  return d.toLocaleDateString("en-GB", {
+export function formatDate(d: Date, locale: Locale = "en"): string {
+  return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -52,13 +56,33 @@ export function formatDate(d: Date): string {
 }
 
 /** all non-draft posts, newest first (drafts stay viewable in dev) */
-export async function getPosts(): Promise<Post[]> {
-  const posts = await getCollection("blog", ({ data }) =>
-    import.meta.env.PROD ? !data.draft : true,
-  );
-  return posts.sort(
-    (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
-  );
+export async function getPosts(locale: Locale = "en"): Promise<Post[]> {
+  return selectArticles(await getCollection("blog"), locale, !import.meta.env.PROD);
+}
+
+export function articleHref(locale: Locale, post: Post): string {
+  return localizedPath(locale, `/blog/${articleKey(post)}/`);
+}
+
+export async function articlePaths(locale: Locale) {
+  const all = await getCollection("blog");
+  const posts = selectArticles(all, locale, !import.meta.env.PROD);
+  return posts.map((post, index) => ({
+    params: { slug: articleKey(post) },
+    props: {
+      post,
+      previous: posts[index - 1] ?? null,
+      next: posts[index + 1] ?? null,
+      availableLocales: (["en", "fr"] as const).filter((lang) => all.some((candidate) =>
+        articleKey(candidate) === articleKey(post) && candidate.data.lang === lang &&
+        (!import.meta.env.PROD || !candidate.data.draft))),
+    },
+  }));
+}
+
+export async function tagPaths() {
+  const posts = [...await getPosts("en"), ...await getPosts("fr")];
+  return collectTags(posts).map(({ slug, name }) => ({ params: { tag: slug }, props: { name } }));
 }
 
 /** Unique tags, ordered by frequency (descending) then name. */
@@ -90,7 +114,7 @@ export function postsForTag(posts: Post[], slug: string): Post[] {
 export function getRelatedPosts(current: Post, posts: Post[], limit = 3): Post[] {
   const currentTags = new Set(current.data.tags.map(tagSlug));
   return posts
-    .filter((post) => post.id !== current.id)
+    .filter((post) => articleKey(post) !== articleKey(current))
     .map((post) => ({
       post,
       sharedTags: post.data.tags.reduce(

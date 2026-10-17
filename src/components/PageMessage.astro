@@ -1,4 +1,6 @@
 ---
+import { localeFromPath, localizedPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 import DotField from "./DotField.astro";
 import UiIcon from "./icons/UiIcon.astro";
 
@@ -9,18 +11,21 @@ interface Props {
 }
 
 const { label, title, description } = Astro.props;
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <main class="page-message">
   <DotField />
   <div class="wrap page-message__content">
-    <p class="page-message__label">{label}</p>
-    <h1>{title}</h1>
-    <p class="page-message__description">{description}</p>
+    <p class="page-message__label">{t(label)}</p>
+    <h1>{t(title)}</h1>
+    <p class="page-message__description">{t(description)}</p>
     <div class="page-message__links">
-      <a href="/" class="page-message__home">
+      <a href={localizedPath(locale)} class="page-message__home">
         <UiIcon name="arrow-left" size={16} />
-        <span>Take me back</span>
+        <span>{t("Take me back")}</span>
       </a>
     </div>
   </div>

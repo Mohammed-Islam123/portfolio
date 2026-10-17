@@ -1,15 +1,21 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
+import { articleHref } from "../lib/blog";
 import type { Post } from "../lib/blog";
 import UiIcon from "./icons/UiIcon.astro";
 
 interface Props { previous: Post | null; next: Post | null; }
 const { previous, next } = Astro.props;
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 {(previous || next) && (
-  <nav class="post-nav" aria-label="Post navigation">
-    {previous ? <a href={`/blog/${previous.id}/`}><span><UiIcon name="arrow-left" size={14} /> Previous</span><strong>{previous.data.title}</strong></a> : <span />}
-    {next ? <a class="post-nav__next" href={`/blog/${next.id}/`}><span>Next <UiIcon name="arrow-right" size={14} /></span><strong>{next.data.title}</strong></a> : <span />}
+  <nav class="post-nav" aria-label={t("Post navigation")}>
+    {previous ? <a href={articleHref(locale, previous)}><span><UiIcon name="arrow-left" size={14} /> {t("Previous")}</span><strong>{previous.data.title}</strong></a> : <span />}
+    {next ? <a class="post-nav__next" href={articleHref(locale, next)}><span>{t("Next")} <UiIcon name="arrow-right" size={14} /></span><strong>{next.data.title}</strong></a> : <span />}
   </nav>
 )}
 

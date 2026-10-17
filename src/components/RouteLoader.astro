@@ -1,6 +1,13 @@
+---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+---
 <route-loader aria-hidden="true">
   <span class="route-loader__bar"><span class="route-loader__fill"></span></span>
-  <span class="route-loader__label">loading</span>
+  <span class="route-loader__label">{t("loading")}</span>
 </route-loader>
 
 <style>

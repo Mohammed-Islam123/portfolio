@@ -1,4 +1,6 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 /**
  * Contact — closing CTA + interactive platform selector + footer bar.
  *  - Main sentence: "if you've made it this far,"
@@ -12,7 +14,7 @@
  *  - AmbientSignal shader behind (reactive flowing sine lines).
  *  - Footer bar: copyright + sound toggle.
  */
-import { siteConfig } from "../config/site";
+import { getSiteConfig } from "../config/site";
 import SectionLabel from "./primitives/SectionLabel.astro";
 import Reveal from "./primitives/Reveal.astro";
 import AmbientSignal from "./AmbientSignal.astro";
@@ -20,7 +22,11 @@ import SocialIcon from "./icons/SocialIcon.astro";
 import UiIcon from "./icons/UiIcon.astro";
 
 const buildYear = new Date().getFullYear();
-const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+const siteConfig = getSiteConfig(locale);
+const defaultPlatform = siteConfig.contactPlatforms[0];
 ---
 
 <footer
@@ -32,7 +38,7 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
 
   <div class="relative wrap py-[clamp(5rem,14vh,9rem)]">
     <Reveal>
-      <SectionLabel>contact</SectionLabel>
+      <SectionLabel>{t("contact")}</SectionLabel>
     </Reveal>
 
     <Reveal delay={80}>
@@ -58,7 +64,7 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
               data-action-link
               data-sound-hover
               data-sound-click
-              aria-label={`Say hi via ${defaultPlatform.label}`}
+              aria-label={`${t("Say hi via")} ${defaultPlatform.label}`}
               class="contact-action flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-full py-3 pl-5 pr-3 text-[var(--ink)]"
             >
               <span class="whitespace-nowrap">
@@ -96,7 +102,7 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
                 aria-expanded="false"
                 aria-controls="platform-dropdown"
                 aria-haspopup="listbox"
-                aria-label={`Select contact platform, current: ${defaultPlatform.label}`}
+                aria-label={`${t("Select contact platform, current:")} ${defaultPlatform.label}`}
                 data-sound-hover
                 data-sound-click
                 class="contact-toggle flex h-11 w-11 items-center justify-center rounded-full"
@@ -112,7 +118,7 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
           <div
             id="platform-dropdown"
             role="listbox"
-            aria-label="Contact platforms"
+            aria-label={t("Contact platforms")}
             hidden
             tabindex="-1"
             class="contact-dropdown absolute right-0 top-[calc(100%+8px)] z-40 w-52 max-w-full rounded-[var(--radius)] border border-[var(--line-strong)] bg-[var(--surface)] p-1.5"
@@ -187,11 +193,11 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
         <sound-toggle>
           <span class="st-label sound-off" hidden>
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-[var(--ink-dim)]"></span>
-            sound · off
+            {t("sound · off")}
           </span>
           <button type="button" class="st-btn hidden items-center gap-2 transition-colors hover:text-[var(--ink)] cursor-pointer">
             <span class="st-led inline-block h-1.5 w-1.5 rounded-full transition-[background-color,box-shadow] [transition-duration:var(--transition)]"></span>
-            <span class="st-text">sound · on</span>
+            <span class="st-text">{t("sound · on")}</span>
           </button>
         </sound-toggle>
       </div>
@@ -209,6 +215,8 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
 </footer>
 
 <script>
+  import { useTranslations } from "../config/i18n";
+  const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   import {
     isSoundOn,
     isSoundCapableNow,
@@ -241,13 +249,13 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
       const render = () => {
         const on = isSoundOn();
         btn.setAttribute("aria-pressed", String(on));
-        btn.setAttribute("aria-label", on ? "turn sound off" : "turn sound on");
+        btn.setAttribute("aria-label", on ? t("turn sound off") : t("turn sound on"));
         led.className = `st-led inline-block h-1.5 w-1.5 rounded-full transition-[background-color,box-shadow] [transition-duration:var(--transition)] ${
           on
             ? "bg-[var(--ink)] shadow-[0_0_6px_rgba(255,255,255,0.4)]"
             : "bg-[var(--ink-dim)]"
         }`;
-        text.textContent = `sound · ${on ? "on" : "off"}`;
+        text.textContent = t(on ? "sound · on" : "sound · off");
       };
       render();
 
@@ -321,7 +329,7 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
 
         // Update action link & label
         actionLink.href = href;
-        actionLink.setAttribute("aria-label", `Say hi via ${label}`);
+        actionLink.setAttribute("aria-label", `${t("Say hi via")} ${label}`);
         if (href.startsWith("http")) {
           actionLink.target = "_blank";
           actionLink.rel = "noopener noreferrer";
@@ -330,7 +338,7 @@ const defaultPlatform = siteConfig.contactPlatforms[0]; // WhatsApp
           actionLink.removeAttribute("rel");
         }
         activeLabel.textContent = label;
-        toggleBtn.setAttribute("aria-label", `Select contact platform, current: ${label}`);
+        toggleBtn.setAttribute("aria-label", `${t("Select contact platform, current:")} ${label}`);
 
         // Update active icon
         iconSpans.forEach((span) => {

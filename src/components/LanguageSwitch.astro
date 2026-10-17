@@ -1,0 +1,270 @@
+---
+import UiIcon from "./icons/UiIcon.astro";
+import { locales, localeFromPath, localizedPath } from "../lib/i18n";
+import { languageNames, useTranslations } from "../config/i18n";
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+const menuId = `language-menu-${crypto.randomUUID()}`;
+---
+<language-switch class="language-switch">
+  <button
+    type="button"
+    class="language-toggle"
+    data-language-toggle
+    aria-haspopup="true"
+    aria-controls={menuId}
+    aria-expanded="false"
+    aria-label={t("Language")}
+    title={t("Language")}
+  >
+    <UiIcon name="languages" size={17} />
+  </button>
+  <ul
+    id={menuId}
+    class="language-menu"
+    data-language-menu
+    role="menu"
+    aria-label={t("Language")}
+    hidden
+  >
+    {locales.map((lang) => (
+      <li role="none">
+        {lang === locale ? (
+          <span
+            class="language-option is-selected"
+            lang={lang}
+            role="menuitem"
+            aria-current="true"
+            tabindex="-1"
+          >
+            <span>{languageNames[lang]}</span>
+            <span aria-hidden="true" class="language-current"></span>
+          </span>
+        ) : (
+          <a
+            class="language-option"
+            href={localizedPath(lang, Astro.url.pathname) + Astro.url.search}
+            lang={lang}
+            hreflang={lang}
+            role="menuitem"
+            tabindex="0"
+            data-language-switch
+            aria-label={t(lang === "en" ? "Switch to English" : "Switch to French")}
+          >
+            <span>{languageNames[lang]}</span>
+          </a>
+        )}
+      </li>
+    ))}
+  </ul>
+</language-switch>
+<script>
+  class LanguageSwitch extends HTMLElement {
+    private events?: AbortController;
+
+    public setOpen(open: boolean) {
+      const button = this.querySelector<HTMLButtonElement>("[data-language-toggle]");
+      const menu = this.querySelector<HTMLElement>("[data-language-menu]");
+      if (!button || !menu) return;
+      if (open) {
+        menu.hidden = false;
+        button.setAttribute("aria-expanded", "true");
+        this.positionMenu(button, menu);
+      } else {
+        menu.hidden = true;
+        button.setAttribute("aria-expanded", "false");
+      }
+    }
+
+    public positionMenu(button: HTMLButtonElement, menu: HTMLElement) {
+      const rect = button.getBoundingClientRect();
+      const width = Math.min(192, window.innerWidth - 16);
+      menu.style.inlineSize = `${width}px`;
+      const left = (rect.left !== undefined && rect.left + width <= window.innerWidth - 8)
+        ? rect.left
+        : (rect.right - width);
+      menu.style.insetInlineStart = `${Math.max(8, Math.min(left, window.innerWidth - width - 8))}px`;
+      const height = menu.children.length * 44 + 10;
+      const top = rect.bottom + height + 16 <= window.innerHeight ? rect.bottom + 8 : Math.max(8, rect.top - height - 8);
+      menu.style.insetBlockStart = `${top}px`;
+    }
+
+    connectedCallback() {
+      this.events?.abort();
+      this.events = new AbortController();
+      const { signal } = this.events;
+      const button = this.querySelector<HTMLButtonElement>("[data-language-toggle]");
+      const menu = this.querySelector<HTMLElement>("[data-language-menu]");
+      if (!button || !menu) return;
+
+      const doc = this.ownerDocument || (typeof document !== "undefined" ? document : null);
+
+      button.addEventListener("click", (event) => {
+        event.stopPropagation();
+        this.setOpen(Boolean(menu.hidden));
+      }, { signal });
+
+      doc?.addEventListener("pointerdown", (event) => {
+        if (!this.contains(event.target as Node)) {
+          this.setOpen(false);
+        }
+      }, { signal });
+
+      this.addEventListener("click", (event) => {
+        const link = (event.target as Element).closest<HTMLAnchorElement>("a[data-language-switch]");
+        if (link) {
+          const section = doc?.querySelector<HTMLElement>('[data-nav-link][aria-current="page"]')?.dataset.navLink;
+          link.hash = location.hash || (section ? `#${section}` : "");
+          this.setOpen(false);
+          return;
+        }
+        const selected = (event.target as Element).closest<HTMLElement>(".language-option.is-selected");
+        if (selected) {
+          this.setOpen(false);
+        }
+      }, { signal });
+
+      this.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !menu.hidden) {
+          event.preventDefault();
+          event.stopPropagation();
+          this.setOpen(false);
+          button.focus({ preventScroll: true });
+          return;
+        }
+
+        if ((event.key === "ArrowDown" || event.key === "ArrowUp") && !menu.hidden) {
+          event.preventDefault();
+          const items = Array.from(menu.querySelectorAll<HTMLElement>(".language-option"));
+          if (!items.length) return;
+          const currentIndex = items.indexOf(doc?.activeElement as HTMLElement);
+          const nextIndex = event.key === "ArrowDown"
+            ? (currentIndex + 1) % items.length
+            : (currentIndex - 1 + items.length) % items.length;
+          items[nextIndex]?.focus();
+        }
+      }, { signal });
+
+      window.addEventListener("resize", () => this.setOpen(false), { signal });
+      window.addEventListener("scroll", () => this.setOpen(false), { signal, capture: true });
+    }
+
+    disconnectedCallback() {
+      this.events?.abort();
+    }
+  }
+
+  if (!customElements.get("language-switch")) customElements.define("language-switch", LanguageSwitch);
+</script>
+<style>
+  .language-switch {
+    position: relative;
+    display: inline-flex;
+    flex: none;
+    pointer-events: auto;
+  }
+  .language-toggle {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 36px;
+    block-size: 36px;
+    padding: 0;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink-muted);
+    cursor: pointer;
+    box-shadow: none;
+    transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+  }
+  /* Accessible touch target padding */
+  .language-toggle::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+  }
+  .language-toggle:hover,
+  .language-toggle[aria-expanded="true"] {
+    color: var(--ink);
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+  }
+  .language-toggle:focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: 2px;
+  }
+  .language-menu {
+    position: fixed;
+    inset: auto;
+    z-index: 60;
+    inline-size: min(192px, calc(100vw - 16px));
+    max-block-size: calc(100dvh - 16px);
+    overflow-y: auto;
+    margin: 0;
+    padding: 4px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--ink-muted);
+    list-style: none;
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.5), 0 4px 12px -2px rgba(0, 0, 0, 0.35);
+  }
+  :global(html.light) .language-menu {
+    box-shadow: 0 12px 32px -8px rgba(0, 0, 0, 0.12), 0 4px 12px -2px rgba(0, 0, 0, 0.04);
+  }
+  .language-menu:not([hidden]) {
+    animation: language-menu-in 140ms var(--ease) both;
+  }
+  .language-option {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-block-size: 40px;
+    padding-inline: 12px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--ink-muted);
+    text-decoration: none;
+    transition: color var(--transition-fast), background-color var(--transition-fast);
+  }
+  .language-option.is-selected {
+    color: var(--ink);
+    background: var(--surface-2);
+    font-weight: 500;
+  }
+  .language-current {
+    inline-size: 5px;
+    block-size: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  a.language-option:hover {
+    color: var(--ink);
+    background: var(--surface-2);
+  }
+  .language-option:focus-visible {
+    outline: 2px solid var(--signal);
+    outline-offset: -2px;
+  }
+  @keyframes language-menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .language-toggle {
+      transition: none;
+    }
+    .language-menu:not([hidden]) {
+      animation: none;
+    }
+  }
+</style>

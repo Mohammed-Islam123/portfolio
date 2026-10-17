@@ -16,6 +16,8 @@ const blog = defineCollection({
   loader: glob({ pattern: '**/*.{md,mdx}', base: './src/content/blog' }),
   schema: ({ image }) =>
     z.object({
+      lang: z.enum(["en", "fr"]).default("en"),
+      translationKey: z.string().regex(/^[a-z0-9]+(?:[-/][a-z0-9]+)*$/).optional(),
       title: z.string(),
       /** dek — the one-line subtitle under the title */
       description: z.string(),

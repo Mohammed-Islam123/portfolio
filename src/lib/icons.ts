@@ -7,6 +7,7 @@
  */
 
 export const UI_ICONS: Record<string, string> = {
+  languages: `<path d="m5 8 6 6"/><path d="m4 14 6-6 2-3H2"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/>`,
   close: `<path d="m6 6 12 12"/><path d="M6 18 18 6"/>`,
   "arrow-up-right": `<path d="M7 7h10v10"/><path d="M7 17 17 7"/>`,
   "arrow-right": `<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>`,

@@ -1,0 +1,18 @@
+---
+import { siteConfig } from "../config/site";
+import { pageMessages } from "../config/pageMessages";
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
+import Layout from "../layouts/Layout.astro";
+import BlogBar from "../components/BlogBar.astro";
+import PageMessage from "../components/PageMessage.astro";
+
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+---
+
+<Layout title={`${t("Page not found")} · ${siteConfig.name}`} description={t(pageMessages.notFound.description)}>
+  <BlogBar />
+  <PageMessage {...pageMessages.notFound} />
+</Layout>

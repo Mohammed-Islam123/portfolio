@@ -1,3 +1,8 @@
+---
+import { localeFromPath } from "../lib/i18n";
+const locale = localeFromPath(Astro.url.pathname);
+const greeting = locale === "fr" ? "bonjour" : "hello";
+---
 <!--
   Greeting — cycles the hero greeting through the languages spoken
   in Algiers (English → French → Arabic), using a Text Scramble
@@ -70,12 +75,12 @@
     dir="auto"
     style="display: inline-block; animation: greet-in 460ms var(--ease) both;"
   >
-    hello</span
+    {greeting}</span
   >
   <!-- sr-only live region — announces the settled greeting word to
        screen readers (the scramble itself is noise, so we only
        announce once per swap, after the scramble completes). -->
-  <span class="sr-only greet-live" aria-live="polite">hello</span>
+  <span class="sr-only greet-live" aria-live="polite">{greeting}</span>
 </hero-greeting>
 
 <script>
@@ -92,8 +97,8 @@
       const liveEl = this.querySelector<HTMLElement>(".greet-live");
       if (!wordEl || !liveEl) return;
 
-      let i = 0;
-      let text: string = greetings[0].text;
+      let i = document.documentElement.lang === "fr" ? 1 : 0;
+      let text: string = greetings[i].text;
 
       // restart a CSS animation in place (used instead of React's
       // key-remount to re-fire greet-in / hand-wave on each swap)

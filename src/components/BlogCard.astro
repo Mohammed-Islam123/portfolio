@@ -1,5 +1,8 @@
 ---
+import { localeFromPath, localizedPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 import { Image } from "astro:assets";
+import { articleHref } from "../lib/blog";
 import type { Post } from "../lib/blog";
 import { formatDate, readingTimeMinutes, tagSlug, wordCount } from "../lib/blog";
 
@@ -13,11 +16,14 @@ const { title, description, pubDate, tags, thumbnail, thumbnailAlt } = post.data
 const words = wordCount(post.body ?? "");
 const minutes = readingTimeMinutes(post.body ?? "");
 const monogram = title.trim().charAt(0).toUpperCase();
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <article class={`blog-card ${index === 0 ? "blog-card--first" : ""}`}>
   <div class="blog-card__layout">
-    <a class="blog-card__media" href={`/blog/${post.id}/`} aria-label={`Read ${title}`}>
+    <a class="blog-card__media" href={articleHref(locale, post)} aria-label={`${t("Read")} ${title}`}>
       {thumbnail ? (
         <Image
           src={thumbnail}
@@ -33,18 +39,19 @@ const monogram = title.trim().charAt(0).toUpperCase();
 
     <div class="blog-card__content">
       <p class="blog-card__meta">
-        <time datetime={pubDate.toISOString()}>{formatDate(pubDate)}</time>
+        <time datetime={pubDate.toISOString()}>{formatDate(pubDate, locale)}</time>
         <span aria-hidden="true">·</span>
-        <span>{words} words</span>
+        <span>{words} {t("words")}</span>
         <span aria-hidden="true">·</span>
-        <span>{minutes} min read</span>
+        <span>{minutes} {t("min read")}</span>
       </p>
-      <h2 class="blog-card__title"><a href={`/blog/${post.id}/`}>{title}</a></h2>
-      <p class="blog-card__description">{description}</p>
+      {locale !== post.data.lang && <span class="language-badge">{t("English only")}</span>}
+      <h2 class="blog-card__title" lang={post.data.lang}><a href={articleHref(locale, post)}>{title}</a></h2>
+      <p class="blog-card__description" lang={post.data.lang}>{description}</p>
       {tags.length > 0 && (
-        <ul class="blog-card__tags" aria-label="Post tags">
+        <ul class="blog-card__tags" aria-label={t("Post tags")}>
           {tags.map((tag) => (
-            <li><a href={`/blog/tags/${tagSlug(tag)}/`}>{tag}</a></li>
+            <li><a href={localizedPath(locale, `/blog/tags/${tagSlug(tag)}/`)}>{tag}</a></li>
           ))}
         </ul>
       )}

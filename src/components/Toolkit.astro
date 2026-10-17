@@ -1,4 +1,6 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 /**
  * Toolkit — periodic-table-style stack grid (gorix-inspired).
  *
@@ -33,28 +35,33 @@
  *    • tapping outside or moving focus away -> close
  *    • hovering away does NOT close a toggled-open cell
  */
-import { toolGroups } from "../config/toolkit";
+import { toolGroups as sourceGroups } from "../config/toolkit";
 import { technologies, type Technology } from "../config/technologies";
 import Section from "./primitives/Section.astro";
 import SectionLabel from "./primitives/SectionLabel.astro";
 import Reveal from "./primitives/Reveal.astro";
 import TechIcon from "./icons/TechIcon.astro";
 
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+const toolGroups = sourceGroups.map((group) => ({ ...group, label: t(group.label) }));
+
 const filters = [
-  { id: "all", label: "all" },
+  { id: "all", label: t("all") },
   ...toolGroups.map((g) => ({ id: g.id, label: g.label })),
 ];
 const pad = (n: number) => String(n).padStart(2, "0");
+
 ---
 
 <toolkit-grid>
   <Section id="toolkit" class="bg-[var(--bg-soft)]">
     <div class="wrap">
       <Reveal>
-        <SectionLabel>toolkit</SectionLabel>
+        <SectionLabel>{t("toolkit")}</SectionLabel>
       </Reveal>
       <Reveal delay={80}>
-        <h2 class="sec-title mt-3">what's in my toolstack</h2>
+        <h2 class="sec-title mt-3">{t("what's in my toolstack")}</h2>
       </Reveal>
 
       <!-- ── filter row — gorix-style sliding pill ────────────────
@@ -90,7 +97,10 @@ const pad = (n: number) => String(n).padStart(2, "0");
       </Reveal>
 
       <!-- ── groups ───────────────────────────────────────────── -->
-      <div class="mt-10 flex flex-wrap gap-x-10 gap-y-8">
+      <div
+        class="toolkit-groups mt-10 flex flex-wrap gap-x-10 gap-y-8"
+        data-groups
+      >
         {
           toolGroups.map((group, groupIdx) => (
             <div data-group={group.id} class="transition-opacity [transition-duration:var(--transition)] opacity-100">
@@ -99,16 +109,17 @@ const pad = (n: number) => String(n).padStart(2, "0");
                 <span class="h-px w-6 bg-[var(--ink-dim)]/40" aria-hidden="true" />
                 <span class="text-[var(--ink-dim)]">{group.tools.length}</span>
               </h3>
-              <div class="group/tiles grid grid-cols-3 gap-1.5" style="grid-template-columns: repeat(3, 72px); grid-auto-rows: 72px;">
+              <div class="toolkit-tiles group/tiles grid gap-1.5">
                 {group.tools.map((toolId, idx) => {
-                  const tool: Technology = technologies[toolId];
+                  const source: Technology = technologies[toolId];
+                  const tool = { ...source, description: source.description ? t(source.description) : undefined };
                   const hasNote = !!tool.description;
                   return (
                     <div class={`group/cell relative ${hasNote ? "has-note" : ""}`} data-tk-cell>
                       <button
                         type="button"
                         data-cell={`${groupIdx}:${idx}`}
-                        aria-label={`${tool.label}${hasNote ? " — click to toggle notes" : ""}`}
+                        aria-label={`${tool.label}${hasNote ? t(" — click to toggle notes") : ""}`}
                         title={tool.label}
                         aria-expanded={hasNote ? "false" : undefined}
                         aria-controls={hasNote ? `tool-note-${toolId}` : undefined}
@@ -206,8 +217,14 @@ const pad = (n: number) => String(n).padStart(2, "0");
       const indicator = this.querySelector<HTMLElement>("[data-indicator]");
       const groups = Array.from(this.querySelectorAll<HTMLElement>("[data-group]"));
       const cells = Array.from(this.querySelectorAll<HTMLButtonElement>("[data-cell]"));
+      const mobile = window.matchMedia("(max-width: 767px)");
+      const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const groupsArea = this.querySelector<HTMLElement>("[data-groups]")!;
+      let filterAnimation: Animation | undefined;
+      this.cleanupFns.push(() => filterAnimation?.cancel());
+      this.filter = mobile.matches ? "backend" : "all";
 
-      // ── filter row: active button styling + groups dimming ──────
+      // Mobile filters hide other groups; desktop keeps the spotlight layout.
       const renderFilters = () => {
         filterBtns.forEach((btn) => {
           const isActive = btn.dataset.filter === this.filter;
@@ -220,7 +237,9 @@ const pad = (n: number) => String(n).padStart(2, "0");
           btn.classList.toggle("f-active-text", isActive && this.ind.ready);
         });
         groups.forEach((g) => {
-          const dimmed = this.filter !== "all" && this.filter !== g.dataset.group;
+          const excluded = this.filter !== "all" && this.filter !== g.dataset.group;
+          g.hidden = mobile.matches && excluded;
+          const dimmed = !mobile.matches && excluded;
           g.classList.toggle("opacity-25", dimmed);
           g.classList.toggle("opacity-100", !dimmed);
         });
@@ -247,8 +266,19 @@ const pad = (n: number) => String(n).padStart(2, "0");
       };
 
       const applyFilter = (id: string) => {
+        if (id === this.filter) return;
+        const previous = filterBtns.findIndex((btn) => btn.dataset.filter === this.filter);
+        const next = filterBtns.findIndex((btn) => btn.dataset.filter === id);
+        closeActive();
+        filterAnimation?.cancel();
         this.filter = id;
         measure();
+        if (mobile.matches && !motion.matches) {
+          filterAnimation = groupsArea.animate([
+            { transform: `translateY(${next > previous ? 24 : -24}px)`, opacity: 0 },
+            { transform: "translateY(0)", opacity: 1 },
+          ], { duration: 260, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
+        }
       };
 
       filterBtns.forEach((btn) => {
@@ -259,8 +289,12 @@ const pad = (n: number) => String(n).padStart(2, "0");
         }, { signal });
       });
 
-      measure();
       window.addEventListener("resize", measure);
+      mobile.addEventListener("change", () => {
+        closeActive();
+        filterAnimation?.cancel();
+        measure();
+      }, { signal });
       // re-measure once fonts/layout settle
       const t = setTimeout(measure, 350);
       this.cleanupFns.push(() => {
@@ -341,6 +375,7 @@ const pad = (n: number) => String(n).padStart(2, "0");
       };
       window.addEventListener("keydown", onKey);
       this.cleanupFns.push(() => window.removeEventListener("keydown", onKey));
+      measure();
     }
 
     disconnectedCallback() {
@@ -353,6 +388,42 @@ const pad = (n: number) => String(n).padStart(2, "0");
 </script>
 
 <style>
+  .toolkit-tiles {
+    grid-template-columns: repeat(3, 72px);
+    grid-auto-rows: 72px;
+  }
+  @media (max-width: 767px) {
+    [data-filter] {
+      min-height: 44px;
+    }
+    .toolkit-groups {
+      padding: 12px;
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: center;
+    }
+    .toolkit-tiles {
+      grid-auto-rows: minmax(72px, auto);
+      align-items: start;
+    }
+    /* Expanded notes stay in the page flow alongside the mobile cells. */
+    .note-panel {
+      display: none;
+    }
+    [data-tk-cell].is-open .note-panel {
+      display: block;
+      position: relative;
+      top: auto;
+      transform: none;
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .note-panel {
+      transition: none;
+    }
+  }
   /* active filter button states (toggled by JS based on indicator
      readiness — see renderFilters) */
   .f-active-text {

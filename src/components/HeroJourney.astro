@@ -1,4 +1,6 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 import UiIcon from "./icons/UiIcon.astro";
 import {
   heroJourneyDetails,
@@ -15,18 +17,22 @@ const media: HeroJourneyMedia[] = heroJourneyDetails.map((item) => ({
   caption: item.caption,
   cropPosition: item.cropPosition,
 }));
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 {media.length > 0 && (
   <hero-journey
     class="hero-journey pointer-events-none absolute inset-0 block"
     data-media={JSON.stringify(media)}
+    data-view-label={t("View")}
     data-duration={heroJourneySettings.durationMs}
     data-preload-concurrency={heroJourneySettings.preloadConcurrency}
-    aria-label="Project media fragments"
+    aria-label={t("Project media fragments")}
   >
-    <dialog class="journey-viewer" aria-label="Expanded hero photo" data-lenis-prevent>
-      <button class="journey-viewer-close" type="button" aria-label="Close expanded photo" autofocus>
+    <dialog class="journey-viewer" aria-label={t("Expanded hero photo")} data-lenis-prevent>
+      <button class="journey-viewer-close" type="button" aria-label={t("Close expanded photo")} autofocus>
         <UiIcon name="close" size={22} />
       </button>
       <div class="journey-viewer-content"></div>

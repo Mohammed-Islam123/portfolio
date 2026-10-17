@@ -1,4 +1,5 @@
 // @ts-check
+import { readFileSync } from 'node:fs';
 import { defineConfig } from 'astro/config';
 import tailwindcss from '@tailwindcss/vite';
 import mdx from '@astrojs/mdx';
@@ -38,10 +39,25 @@ function markMermaidBlocks() {
   return transformMermaidBlocks;
 }
 
+let outputDir = new URL('./dist/', import.meta.url);
+
 // https://astro.build/config
 export default defineConfig({
   site: 'https://mohamedislam.dev',
-  integrations: [sitemap(), mdx()],
+  i18n: { locales: ['en', 'fr'], defaultLocale: 'en', routing: { prefixDefaultLocale: false } },
+  integrations: [
+    { name: 'output-directory', hooks: { 'astro:config:done': ({ config }) => { outputDir = config.outDir; } } },
+    sitemap({ serialize(item) {
+      const path = new URL(item.url).pathname;
+      const html = readFileSync(new URL(`.${path.endsWith('/') ? path : path + '/'}index.html`, outputDir), 'utf8');
+      // Only real translations belong in the sitemap, never English fallback copies.
+      const canonical = html.match(/<link rel="canonical" href="([^"]+)"/)?.[1];
+      if (canonical !== item.url) return undefined;
+      item.links = [...html.matchAll(/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"/g)].map((match) => ({ lang: match[1], url: match[2] }));
+      return item;
+    } }),
+    mdx(),
+  ],
   vite: {
     plugins: [tailwindcss()],
   },

@@ -716,13 +716,13 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
   top: 0;
   left: 0;
   pointer-events: none;
-  z-index: 100;
+  z-index: 1000;
   mix-blend-mode: difference;
   will-change: transform, opacity;
 }
 
 .c-drag-label {
-  z-index: 101;
+  z-index: 1001;
 }
 
 .c-dot {
@@ -1219,4 +1219,39 @@ html.light .article-body .astro-code span {
   .article-body * {
     transition-duration: 0.001ms !important;
   }
+}
+
+/* Language changes use a short crossfade instead of the page-navigation clip. */
+html.language-transitioning::view-transition-old(root) {
+  animation: language-fade-out 200ms ease both;
+}
+html.language-transitioning::view-transition-new(root) {
+  animation: language-fade-in 200ms ease both;
+}
+@keyframes language-fade-out { to { opacity: 0; } }
+@keyframes language-fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  html.language-transitioning::view-transition-old(root),
+  html.language-transitioning::view-transition-new(root) { animation: none; }
+}
+.translation-notice {
+  margin-block: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--warn);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+.language-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--ink-muted);
 }

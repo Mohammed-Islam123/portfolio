@@ -1,3 +1,10 @@
+---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+---
 <!--
   ThemeToggle — dark/light switch with a desktop circle and mobile fade.
 
@@ -30,8 +37,8 @@
   <button
     type="button"
     class="theme-toggle-btn group/theme relative flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-[color,border-color,background-color,transform] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 hover:border-[var(--ink-muted)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
-    aria-label="toggle theme"
-    title="toggle theme"
+    aria-label={t("toggle theme")}
+    title={t("toggle theme")}
   >
     <!-- sun (shown in dark mode → click to go light).
          Visibility is CSS-driven via .theme-icon-sun (see global.css). -->

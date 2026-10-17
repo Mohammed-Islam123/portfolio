@@ -1,15 +1,22 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 import UiIcon from "./icons/UiIcon.astro";
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <copy-link>
-  <button class="copy-link" type="button" data-copy-link aria-label="Copy link to this post">
+  <button class="copy-link" type="button" data-copy-link aria-label={t("Copy link to this post")}>
     <span data-copy-icon><UiIcon name="copy" size={14} /></span>
-    <span data-copy-label>copy link</span>
+    <span data-copy-label>{t("copy link")}</span>
   </button>
 </copy-link>
 
 <script>
+  import { useTranslations } from "../config/i18n";
+  const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   class CopyLink extends HTMLElement {
     private resetTimer: number | undefined;
 
@@ -31,15 +38,15 @@ import UiIcon from "./icons/UiIcon.astro";
       try {
         await navigator.clipboard.writeText(window.location.href);
         button.dataset.state = "copied";
-        label.textContent = "copied";
+        label.textContent = t("copied");
       } catch {
         button.dataset.state = "failed";
-        label.textContent = "copy unavailable";
+        label.textContent = t("copy unavailable");
       }
       window.clearTimeout(this.resetTimer);
       this.resetTimer = window.setTimeout(() => {
         delete button.dataset.state;
-        label.textContent = "copy link";
+        label.textContent = t("copy link");
       }, 1800);
     };
   }

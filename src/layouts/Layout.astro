@@ -1,4 +1,7 @@
 ---
+import { localeFromPath, localizedPath, locales, type Locale } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
+import { portfolioCopy } from "../config/portfolio";
 import { ClientRouter } from "astro:transitions";
 import Loader from "../components/Loader.astro";
 import RouteLoader from "../components/RouteLoader.astro";
@@ -6,6 +9,8 @@ import "../styles/global.css";
 
 interface Props {
   title?: string;
+  canonicalPath?: string;
+  availableLocales?: Locale[];
   description?: string;
   loading?: {
     mode: "home" | "article" | "generic";
@@ -13,17 +18,21 @@ interface Props {
   } | false;
 }
 
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 const {
-  title = "Mohamed Islam — Backend Engineer",
-  description = "I’m a backend-focused software engineer. I build APIs and services primarily with C# and .NET, and use other languages and technologies when a project needs them. I’m particularly interested in system design, databases, and real-time communication. Outside of software development work work, I enjoy working on IoT and robotics projects.",
-  loading = Astro.url.pathname === "/" ? { mode: "home" } : false,
+  canonicalPath = Astro.url.pathname,
+  availableLocales = [...locales],
+  title = `Mohamed Islam — ${t("Backend Engineer")}`,
+  description = t(portfolioCopy.bio),
+  loading = localizedPath("en", Astro.url.pathname) === "/" ? { mode: "home" } : false,
 } = Astro.props;
 
-const canonical = new URL(Astro.url.pathname, Astro.site);
+const canonical = new URL(canonicalPath, Astro.site);
 const ogImage = new URL("/og.png", Astro.site);
 ---
 
-<html lang="en">
+<html lang={locale}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -35,12 +44,14 @@ const ogImage = new URL("/og.png", Astro.site);
     />
     <meta name="author" content="Mohamed Islam Benyahkem" />
     <link rel="canonical" href={canonical} />
+    {availableLocales.map((lang) => <link rel="alternate" hreflang={lang} href={new URL(localizedPath(lang, canonicalPath), Astro.site)} />)}
+    <meta property="og:locale" content={locale === "fr" ? "fr_FR" : "en_GB"} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
       rel="alternate"
       type="application/rss+xml"
       title="Mohamed Islam — blog"
-      href={new URL("rss.xml", Astro.site)}
+      href={new URL(localizedPath(locale, "/rss.xml"), Astro.site)}
     />
 
     <meta property="og:type" content="website" />

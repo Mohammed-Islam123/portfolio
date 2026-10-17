@@ -1,46 +1,43 @@
 ---
 import { render } from "astro:content";
-import Layout from "../../layouts/Layout.astro";
-import BlogBar from "../../components/BlogBar.astro";
-import ReadingProgress from "../../components/ReadingProgress.astro";
-import Toc from "../../components/Toc.astro";
-import CopyLink from "../../components/CopyLink.astro";
-import RelatedPosts from "../../components/RelatedPosts.astro";
-import PostNav from "../../components/PostNav.astro";
-import ArticleTools from "../../components/ArticleTools.astro";
-import ArticleImageLightbox from "../../components/mdx/ArticleImageLightbox.astro";
-import { formatDate, getPosts, getRelatedPosts, readingTimeMinutes, tagSlug, wordCount, type Post } from "../../lib/blog";
+import { localeFromPath, localizedPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
+import Layout from "../layouts/Layout.astro";
+import BlogBar from "../components/BlogBar.astro";
+import ReadingProgress from "../components/ReadingProgress.astro";
+import Toc from "../components/Toc.astro";
+import CopyLink from "../components/CopyLink.astro";
+import RelatedPosts from "../components/RelatedPosts.astro";
+import PostNav from "../components/PostNav.astro";
+import ArticleTools from "../components/ArticleTools.astro";
+import ArticleImageLightbox from "../components/mdx/ArticleImageLightbox.astro";
+import { articleHref, articleKey, formatDate, getPosts, getRelatedPosts, readingTimeMinutes, tagSlug, wordCount, type Post } from "../lib/blog";
 
-export async function getStaticPaths() {
-  const posts = await getPosts();
-  return posts.map((post, index) => ({
-    params: { slug: post.id },
-    props: {
-      post,
-      previous: index > 0 ? posts[index - 1] : null,
-      next: index < posts.length - 1 ? posts[index + 1] : null,
-    },
-  }));
-}
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 
-const { post, previous, next } = Astro.props as {
+const { post, previous, next, availableLocales } = Astro.props as {
   post: Post;
   previous: Post | null;
   next: Post | null;
+  availableLocales: import("../lib/i18n").Locale[];
 };
 const { Content, headings } = await render(post);
-const posts = await getPosts();
+const posts = await getPosts(locale);
 const related = getRelatedPosts(post, posts);
 const { title, description, pubDate, tags, thumbnail } = post.data;
 const words = wordCount(post.body ?? "");
 const minutes = readingTimeMinutes(post.body ?? "");
 const heroImage = thumbnail?.src;
+
 ---
 
 <Layout
   title={`${title} · Mohamed Islam`}
   description={description}
-  loading={{ mode: "article", slug: post.id }}
+  canonicalPath={articleHref(post.data.lang, post)}
+  {availableLocales}
+  loading={{ mode: "article", slug: articleKey(post) }}
 >
   <BlogBar />
   <ReadingProgress />
@@ -59,17 +56,18 @@ const heroImage = thumbnail?.src;
       <div class="article-shell__offset"></div>
       <div class="wrap article-shell__wrap">
         <header class="article-header">
-          <nav class="article-header__crumb" aria-label="Breadcrumb">
-            <a href="/">Home</a><span aria-hidden="true">/</span><a href="/blog/">Blog</a><span aria-hidden="true">/</span><span>{post.id}</span>
+          <nav class="article-header__crumb" aria-label={t("Breadcrumb")}>
+            <a href={localizedPath(locale)}>{t("Home")}</a><span aria-hidden="true">/</span><a href={localizedPath(locale, "/blog/")}>{t("Blog")}</a><span aria-hidden="true">/</span><span>{post.id}</span>
           </nav>
-          <h1>{title}</h1>
-          <p class="article-header__dek">{description}</p>
+          {locale !== post.data.lang && <p class="translation-notice" role="note">{t("This article is not available in French yet. The English version is shown.")}</p>}
+          <h1 lang={post.data.lang}>{title}</h1>
+          <p class="article-header__dek" lang={post.data.lang}>{description}</p>
           <div class="article-header__meta">
-            <time datetime={pubDate.toISOString()}>{formatDate(pubDate)}</time><span aria-hidden="true">·</span><span>{words} words</span><span aria-hidden="true">·</span><span>{minutes} min read</span>
+            <time datetime={pubDate.toISOString()}>{formatDate(pubDate, locale)}</time><span aria-hidden="true">·</span><span>{words} {t("words")}</span><span aria-hidden="true">·</span><span>{minutes} {t("min read")}</span>
           </div>
           {tags.length > 0 && (
-            <ul class="article-header__tags" aria-label="Post tags">
-              {tags.map((tag) => <li><a href={`/blog/tags/${tagSlug(tag)}/`}>{tag}</a></li>)}
+            <ul class="article-header__tags" aria-label={t("Post tags")}>
+              {tags.map((tag) => <li><a href={localizedPath(locale, `/blog/tags/${tagSlug(tag)}/`)}>{tag}</a></li>)}
             </ul>
           )}
         </header>
@@ -78,7 +76,7 @@ const heroImage = thumbnail?.src;
 
         <div class="article-layout">
           <div class="article-body">
-            <ArticleImageLightbox><Content /></ArticleImageLightbox>
+            <div lang={post.data.lang}><ArticleImageLightbox><Content /></ArticleImageLightbox></div>
             <div class="article-body__share"><CopyLink /></div>
             <RelatedPosts posts={related} />
             <PostNav {previous} {next} />

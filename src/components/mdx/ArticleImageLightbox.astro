@@ -1,21 +1,28 @@
 ---
+import { localeFromPath } from "../../lib/i18n";
+import { useTranslations } from "../../config/i18n";
 /**
  * Progressive enhancement for article images. It makes Markdown and MDX
  * images keyboard-accessible, then opens the original asset in a native
  * dialog. Without JavaScript, every image remains a normal inline image.
  */
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <article-image-lightbox>
   <slot />
-  <dialog class="article-image-dialog" aria-label="Expanded article image">
-    <button class="article-image-dialog__close" type="button" aria-label="Close expanded image">close</button>
+  <dialog class="article-image-dialog" aria-label={t("Expanded article image")}>
+    <button class="article-image-dialog__close" type="button" aria-label={t("Close expanded image")}>{t("close")}</button>
     <img class="article-image-dialog__image" alt="" />
     <p class="article-image-dialog__caption"></p>
   </dialog>
 </article-image-lightbox>
 
 <script>
+  import { useTranslations } from "../../config/i18n";
+  const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   class ArticleImageLightbox extends HTMLElement {
     private abort?: AbortController;
     private dialog?: HTMLDialogElement;
@@ -33,7 +40,7 @@
         image.dataset.zoomable = "true";
         image.tabIndex = 0;
         image.setAttribute("role", "button");
-        image.setAttribute("aria-label", `Open image: ${image.alt || "article image"}`);
+        image.setAttribute("aria-label", `${t("Open image:")} ${image.alt || t("article image")}`);
       });
 
       this.addEventListener("click", this.onClick, { signal: this.abort.signal });

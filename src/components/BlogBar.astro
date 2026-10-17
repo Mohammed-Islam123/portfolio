@@ -1,4 +1,6 @@
 ---
+import { localeFromPath, localizedPath, unlocalizedPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 /**
  * BlogBar — minimal fixed top bar for blog pages (index + articles).
  *
@@ -7,35 +9,43 @@
  * the left, and a ThemeToggle chip on the right — same glass recipe
  * (translucent nav tokens + heavy blur).
  */
+import LanguageSwitch from "./LanguageSwitch.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import UiIcon from "./icons/UiIcon.astro";
 
-const isBlogIndex = Astro.url.pathname === "/blog" || Astro.url.pathname === "/blog/";
+
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+const isBlogIndex = ["/blog", "/blog/"].includes(unlocalizedPath(Astro.url.pathname));
 ---
 
 <div class="fixed inset-x-0 top-0 z-50 flex items-center justify-between gap-3 px-3 pt-3 pointer-events-none">
   <div class="flex items-center gap-2">
     {!isBlogIndex && (
       <a
-        href="/blog/"
+        href={localizedPath(locale, "/blog/")}
+        aria-label={t("all articles")}
         data-sound-hover
         class="blog-bar-chip nav-haze nav-haze--elevated pointer-events-auto inline-flex h-9 items-center gap-2 rounded-[10px] border border-[var(--line-soft)] px-3.5 font-mono text-xs tracking-[0.08em] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
       >
         <UiIcon name="book-open" size={13} />
-        <span>all articles</span>
+        <span class="hidden sm:inline">{t("all articles")}</span>
       </a>
     )}
     <a
-      href="/"
+      href={localizedPath(locale)}
+      aria-label={t("portfolio")}
       data-sound-hover
       class="blog-bar-chip nav-haze nav-haze--elevated pointer-events-auto inline-flex h-9 items-center gap-2 rounded-[10px] border border-[var(--line-soft)] px-3.5 font-mono text-xs tracking-[0.08em] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
     >
       <UiIcon name="briefcase-business" size={13} />
-      <span>portfolio</span>
+      <span class="hidden sm:inline">{t("portfolio")}</span>
     </a>
   </div>
 
-  <div class="pointer-events-auto">
+  <div class="pointer-events-auto flex shrink-0 items-center gap-2">
+    <LanguageSwitch />
     <ThemeToggle />
   </div>
 </div>

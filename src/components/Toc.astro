@@ -1,4 +1,6 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 import UiIcon from "./icons/UiIcon.astro";
 
 interface Heading {
@@ -11,13 +13,16 @@ interface Props {
   variant: "rail" | "box";
 }
 const { headings, variant } = Astro.props;
-const items = headings.filter((h) => h.depth === 2 || h.depth === 3);---
+const items = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+---
 
 {
   variant === "rail" ? (
-    <toc-nav data-lenis-prevent variant="rail" class="toc-rail hidden xl:block" aria-label="table of contents">
+    <toc-nav data-lenis-prevent variant="rail" class="toc-rail hidden xl:block" aria-label={t("table of contents")}>
       <p class="toc-title">
-        contents
+        {t("contents")}
       </p>
       <nav class="toc-list">
         {items.map((h) => (
@@ -31,7 +36,7 @@ const items = headings.filter((h) => h.depth === 2 || h.depth === 3);---
     <details class="toc-box xl:hidden">
       <summary class="toc-box-head">
         <span class="toc-title">
-          contents
+          {t("contents")}
         </span>
         <span class="toc-chev" aria-hidden="true"><UiIcon name="chevron-right" size={12} /></span>
       </summary>

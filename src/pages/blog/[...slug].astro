@@ -1,0 +1,6 @@
+---
+import View from "../../views/Article.astro";
+import { articlePaths } from "../../lib/blog";
+export async function getStaticPaths() { return articlePaths("en"); }
+---
+<View {...Astro.props} />

@@ -1,0 +1,6 @@
+---
+import View from "../../../../views/Tag.astro";
+import { tagPaths } from "../../../../lib/blog";
+export async function getStaticPaths() { return tagPaths(); }
+---
+<View {...Astro.props} />

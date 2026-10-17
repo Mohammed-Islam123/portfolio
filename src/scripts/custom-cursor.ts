@@ -1,3 +1,5 @@
+import { useTranslations } from "../config/i18n";
+
 /**
  * Custom cursor — values and movement reproduced from Codapress's rendered
  * cursor: a 30px large square (0.2 follow), 10px small square (0.45 follow),
@@ -35,7 +37,12 @@ if (typeof window !== "undefined" && !(window as { __cursorInit?: boolean }).__c
     leftChevron.className = "c-drag-chevron";
     const label = document.createElement("span");
     label.className = "c-drag-text";
-    label.textContent = "SWIPE";
+    const updateLanguage = () => {
+      label.textContent = useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")("SWIPE");
+      document.documentElement.classList.add("cursor-custom");
+    };
+    updateLanguage();
+    document.addEventListener("astro:after-swap", updateLanguage);
     const rightChevron = document.createElement("span");
     rightChevron.className = "c-drag-chevron c-drag-chevron--right";
     labelInner.append(leftChevron, label, rightChevron);

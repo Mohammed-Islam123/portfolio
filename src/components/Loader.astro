@@ -1,4 +1,6 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 interface Props {
   mode?: "home" | "article" | "generic";
   slug?: string;
@@ -16,6 +18,9 @@ const typeDuration = command
     ? 760
     : Math.max(500, command.text.length * 15)
   : 0;
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <noscript><style>.loader-overlay{display:none}</style></noscript>
@@ -24,7 +29,7 @@ const typeDuration = command
     class="loader-overlay"
     role="dialog"
     aria-modal="true"
-    aria-label="Loading portfolio"
+    aria-label={t("Loading portfolio")}
   >
     <div class="loader-terminal">
       {command && (
@@ -38,10 +43,10 @@ const typeDuration = command
         </div>
       )}
       <p class="loader-status">
-        <span>loading</span><span class="loader-dots" aria-hidden="true">…</span>
+        <span>{t("loading")}</span><span class="loader-dots" aria-hidden="true">…</span>
       </p>
     </div>
-    <span class="sr-only" aria-live="polite" data-live>Loading portfolio</span>
+    <span class="sr-only" aria-live="polite" data-live>{t("Loading portfolio")}</span>
   </div>
 </boot-loader>
 

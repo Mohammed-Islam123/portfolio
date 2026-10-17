@@ -1,4 +1,6 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 /**
  * Projects — 3D "coverflow" depth carousel.
  *
@@ -31,7 +33,7 @@
  *  A list view offers the same projects as expandable rows. The carousel
  *  rotates every three seconds while visible and idle.
  */
-import { projects, type Project } from "../config/projects";
+import { projects as sourceProjects, type Project } from "../config/projects";
 import Section from "./primitives/Section.astro";
 import SectionLabel from "./primitives/SectionLabel.astro";
 import Reveal from "./primitives/Reveal.astro";
@@ -101,21 +103,25 @@ function coverflowTransform(offset: number): {
 const cardTransition =
   "transform 620ms cubic-bezier(0.22,1,0.36,1), opacity 520ms var(--ease), filter 520ms var(--ease), border-color 420ms var(--ease), box-shadow 420ms var(--ease)";
 
-const count = projects.length;
 const pad = (n: number) => String(n).padStart(2, "0");
 const isExternalLink = (href: string) => /^https?:\/\//.test(href);
 const linkIcon = (kind: Project["links"][number]["kind"]) =>
   kind === "case" ? "chevron-right" : "arrow-up-right";
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+const projects: Project[] = sourceProjects.map((project) => ({ ...project, description: t(project.description), links: project.links.map((link) => ({ ...link, label: t(link.label) })) }));
+const count = projects.length;
 ---
 
 <project-carousel data-count={count} data-slugs={projects.map((p) => p.slug).join(",")}>
   <Section id="projects" class="bg-[var(--bg-soft)]">
     <div class="wrap">
       <Reveal>
-        <SectionLabel>projects</SectionLabel>
+        <SectionLabel>{t("projects")}</SectionLabel>
       </Reveal>
       <Reveal delay={80}>
-        <h2 class="sec-title mt-3 max-w-2xl">Things I've built.</h2>
+        <h2 class="sec-title mt-3 max-w-2xl">{t("Things I've built.")}</h2>
       </Reveal>
       <div class="mt-8 flex items-center justify-end gap-3">
         <div class="flex items-center gap-2">
@@ -128,13 +134,13 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
           >
             <span data-view-icon="list"><UiIcon name="list" size={14} /></span>
             <span data-view-icon="carousel" hidden><UiIcon name="layout-grid" size={14} /></span>
-            <span data-view-label>list view</span>
+            <span data-view-label>{t("list view")}</span>
           </button>
           <!-- prev arrow -->
           <button
             type="button"
             data-arrow="left"
-            aria-label="previous"
+            aria-label={t("previous")}
             class="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
           >
             <svg
@@ -156,7 +162,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
           <button
             type="button"
             data-arrow="right"
-            aria-label="next"
+            aria-label={t("next")}
             class="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
           >
             <svg
@@ -193,7 +199,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
       <div
         tabindex="0"
         role="region"
-        aria-label="projects carousel"
+        aria-label={t("projects carousel")}
         aria-roledescription="carousel"
         aria-live="off"
         data-cursor="swipe"
@@ -201,7 +207,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
       >
         {
           projects.map((p, i) => {
-            const t = coverflowTransform(i);
+            const transform = coverflowTransform(i);
             const isActive = i === 0;
             const primaryTech = p.tech[0];
             return (
@@ -211,7 +217,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
                 aria-hidden={!isActive ? "true" : undefined}
                 aria-label={`${p.title} — ${p.year}`}
                 class="coverflow-card group absolute left-1/2 top-4 flex w-[86vw] max-w-[420px] -translate-x-1/2 flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line)] bg-[var(--surface)] [transform-style:preserve-3d] [backface-visibility:hidden] will-change-transform"
-                style={`transform: ${t.transform}; opacity: ${t.opacity}; z-index: ${t.zIndex}; pointer-events: ${t.pointerEvents}; filter: ${t.filter}; --card-accent: ${p.accent}; transition: ${cardTransition}; cursor: ${isActive ? "default" : "pointer"};`}
+                style={`transform: ${transform.transform}; opacity: ${transform.opacity}; z-index: ${transform.zIndex}; pointer-events: ${transform.pointerEvents}; filter: ${transform.filter}; --card-accent: ${p.accent}; transition: ${cardTransition}; cursor: ${isActive ? "default" : "pointer"};`}
               >
                 <div class="relative h-50 shrink-0 overflow-hidden rounded-t-[var(--radius-lg)]">
                   {p.image && (
@@ -269,7 +275,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
                     aria-expanded="false"
                     class="project-description-toggle mt-1 inline-flex min-h-11 items-center self-start font-mono text-xs text-[var(--ink-soft)] underline underline-offset-4 transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
                     hidden
-                  >Read more</button>
+                  >{t("Read more")}</button>
 
                   <!-- tech -->
                   <div class="mt-4 flex flex-wrap gap-1.5 pb-2">
@@ -330,7 +336,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
           data-list-scroll
           tabindex="0"
           role="region"
-          aria-label="project list"
+          aria-label={t("project list")}
           class="max-h-[31rem] overflow-y-auto px-4 py-4 [scrollbar-width:thin] [scrollbar-color:var(--line)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--line)] [&::-webkit-scrollbar-track]:bg-transparent md:max-h-[38.25rem]"
         >
           <div class="grid gap-3">
@@ -367,7 +373,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
                     aria-expanded="false"
                     class="project-description-toggle mt-1 inline-flex min-h-11 items-center font-mono text-xs text-[var(--ink-soft)] underline underline-offset-4 transition-colors [transition-duration:var(--transition-fast)] hover:text-[var(--ink)]"
                     hidden
-                  >Read more</button>
+                  >{t("Read more")}</button>
                   <div class="mt-4 border-t border-[var(--line-soft)] pt-3 font-mono text-xs">
                     <div class="flex flex-wrap gap-1.5">
                       {p.tech.map((tech) => (
@@ -414,6 +420,8 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
 </project-carousel>
 
 <script>
+  import { useTranslations } from "../config/i18n";
+  const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   import { playSound } from "../scripts/sound-init";
 
   /** coverflowTransform — must stay in sync with the frontmatter copy
@@ -538,7 +546,7 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
         const hasOverflow = fullHeight > collapsedHeight + 2;
         if (!hasOverflow) state.expanded = false;
         state.toggle.hidden = !hasOverflow;
-        state.toggle.textContent = state.expanded ? "Read less" : "Read more";
+        state.toggle.textContent = state.expanded ? t("Read less") : t("Read more");
         state.toggle.setAttribute("aria-expanded", String(state.expanded));
         state.viewport.style.height = `${state.expanded ? fullHeight : collapsedHeight}px`;
       };
@@ -677,9 +685,9 @@ const linkIcon = (kind: Project["links"][number]["kind"]) =>
         viewToggle?.setAttribute("aria-pressed", String(showingList));
         viewToggle?.setAttribute(
           "aria-label",
-          showingList ? "switch to carousel view" : "switch to list view",
+          showingList ? t("switch to carousel view") : t("switch to list view"),
         );
-        if (viewLabel) viewLabel.textContent = showingList ? "carousel view" : "list view";
+        if (viewLabel) viewLabel.textContent = showingList ? t("carousel view") : t("list view");
         listIcon?.toggleAttribute("hidden", showingList);
         carouselIcon?.toggleAttribute("hidden", !showingList);
         if (showingList) {

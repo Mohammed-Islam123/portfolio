@@ -1,12 +1,4 @@
 ---
-import { siteConfig } from "../config/site";
-import { pageMessages } from "../config/pageMessages";
-import Layout from "../layouts/Layout.astro";
-import BlogBar from "../components/BlogBar.astro";
-import PageMessage from "../components/PageMessage.astro";
+import View from "../views/NotFound.astro";
 ---
-
-<Layout title={`Page not found · ${siteConfig.name}`} description={pageMessages.notFound.description}>
-  <BlogBar />
-  <PageMessage {...pageMessages.notFound} />
-</Layout>
+<View {...Astro.props} />

@@ -1,3 +1,7 @@
+import type { Locale } from "../lib/i18n.ts";
+import { localizedPath } from "../lib/i18n.ts";
+import { useTranslations } from "./i18n.ts";
+
 /**
  * SITE CONFIG — global identity, contact, and status.
  * Edit here, reflects everywhere.
@@ -112,3 +116,17 @@ export const siteConfig = {
 } as const;
 
 export type SiteConfig = typeof siteConfig;
+
+export function getSiteConfig(locale: Locale) {
+  const t = useTranslations(locale);
+  const emailHref = `mailto:${contactEmail}?subject=${encodeURIComponent(t(emailSubject))}&body=${encodeURIComponent(t(emailBodyTemplate))}`;
+  return {
+    ...siteConfig,
+    role: t(siteConfig.role),
+    roleKeywords: t(siteConfig.roleKeywords),
+    status: { ...siteConfig.status, label: t(siteConfig.status.label) },
+    contactCopy: { headline: t(siteConfig.contactCopy.headline), action: t(siteConfig.contactCopy.action), profiles: t(siteConfig.contactCopy.profiles) },
+    contactPlatforms: siteConfig.contactPlatforms.map((platform) => ({ ...platform, label: t(platform.label), href: platform.id === "email" ? emailHref : platform.id === "whatsapp" ? `https://wa.me/213794839435?text=${encodeURIComponent(t(contactMessageTemplate))}` : platform.href })),
+    socialProfiles: siteConfig.socialProfiles.map((profile) => ({ ...profile, label: t(profile.label), href: profile.href === "/" ? localizedPath(locale) : profile.href })),
+  };
+}

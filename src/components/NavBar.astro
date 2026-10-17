@@ -1,10 +1,16 @@
 ---
+import { localeFromPath, localizedPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 /** Home navigation with scrollspy and a mobile menu. */
 import { navItems } from "../config/nav";
 import { siteConfig } from "../config/site";
+import LanguageSwitch from "./LanguageSwitch.astro";
 import ThemeToggle from "./ThemeToggle.astro";
 import SoundVolume from "./SoundVolume.astro";
 import UiIcon from "./icons/UiIcon.astro";
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <nav-bar
@@ -13,7 +19,7 @@ import UiIcon from "./icons/UiIcon.astro";
 >
   <header class="nav-header fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 pointer-events-none">
     <nav
-      aria-label="primary"
+      aria-label={t("primary")}
       data-lenis-prevent
       class="nav-desktop nav-haze nav-haze--elevated pointer-events-auto hidden md:flex max-w-[calc(100vw-10rem)] items-center gap-0.5 overflow-x-auto rounded-[10px] border border-[var(--line-soft)] p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
@@ -24,19 +30,20 @@ import UiIcon from "./icons/UiIcon.astro";
             data-nav-link={item.id}
             class="nav-link relative shrink-0 rounded-[7px] px-3.5 py-1.5 font-mono text-xs transition-[color,background-color] [transition-duration:var(--transition-fast)]"
           >
-            {item.label}
+            {t(item.label)}
           </a>
         ))
       }
       <span aria-hidden="true" class="mx-0.5 h-5 w-px shrink-0 bg-[var(--line)]"></span>
       <a
-        href="/blog/"
+        href={localizedPath(locale, "/blog/")}
         data-blog-link
         class="nav-blog-link shrink-0 inline-flex items-center gap-2 rounded-[7px] px-3 py-1.5 font-mono text-xs tracking-[0.04em] text-[var(--ink-muted)] transition-[color,background-color,border-color] [transition-duration:var(--transition-fast)]"
       >
         <UiIcon name="book-open" size={14} />
-        <span>Blog</span>
+        <span>{t("Blog")}</span>
       </a>
+      <LanguageSwitch />
       <div class="shrink-0 px-0.5">
         <ThemeToggle />
       </div>
@@ -45,12 +52,13 @@ import UiIcon from "./icons/UiIcon.astro";
       <SoundVolume instance="desktop" />
     </div>
     <div class="pointer-events-auto ml-auto flex items-center gap-2 md:hidden">
+      <LanguageSwitch />
       <SoundVolume instance="mobile" />
       <a
-        href="/blog/"
+        href={localizedPath(locale, "/blog/")}
         data-blog-link
         class="nav-blog-mobile nav-haze--elevated flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] text-[var(--ink-muted)] backdrop-blur-[12px] transition-[color,background-color,border-color] [transition-duration:var(--transition-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
-        aria-label="Open blog"
+        aria-label={t("Open blog")}
       >
         <UiIcon name="book-open" size={16} />
       </a>
@@ -66,7 +74,7 @@ import UiIcon from "./icons/UiIcon.astro";
       <button
         type="button"
         class="nav-burger nav-haze--elevated flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] backdrop-blur-[12px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60 transition-[border-color,background-color] [transition-duration:var(--transition-fast)]"
-        aria-label="Open menu"
+        aria-label={t("Open menu")}
         aria-expanded="false"
         aria-controls="mobile-nav"
       >
@@ -81,7 +89,7 @@ import UiIcon from "./icons/UiIcon.astro";
 
   <nav
     id="mobile-nav"
-    aria-label="mobile primary"
+    aria-label={t("mobile primary")}
     class="nav-mobile-panel nav-haze--elevated fixed right-3 top-14 z-50 w-[min(240px,calc(100vw-1.5rem))] overflow-hidden rounded-[12px] border border-[var(--line-soft)] bg-[var(--nav-frost-bg)] p-1.5 backdrop-blur-[12px] md:hidden"
     hidden
   >
@@ -93,7 +101,7 @@ import UiIcon from "./icons/UiIcon.astro";
           class="nav-m-link flex items-center justify-between rounded-[8px] px-4 py-3 font-mono text-sm transition-[color,background-color] [transition-duration:var(--transition-fast)]"
           style={`--item-delay: ${i * 35}ms;`}
         >
-          <span class="tracking-[0.04em]">{item.label}</span>
+          <span class="tracking-[0.04em]">{t(item.label)}</span>
           <span
             aria-hidden="true"
             class="nav-active-dot h-1.5 w-1.5 rounded-full bg-[var(--signal)]"
@@ -104,8 +112,12 @@ import UiIcon from "./icons/UiIcon.astro";
     }
     <div aria-hidden="true" class="my-1 mx-2 h-px bg-[var(--line)]"></div>
     <div class="flex items-center justify-between px-4 py-2.5">
+      <span class="font-mono text-xs text-[var(--ink-dim)]">{t("Language")}</span>
+      <LanguageSwitch />
+    </div>
+    <div class="flex items-center justify-between px-4 py-2.5">
       <span class="font-mono text-xs tracking-[0.08em] text-[var(--ink-dim)] uppercase">
-        theme
+        {t("theme")}
       </span>
       <ThemeToggle />
     </div>
@@ -121,6 +133,8 @@ import UiIcon from "./icons/UiIcon.astro";
 </nav-bar>
 
 <script>
+  import { useTranslations } from "../config/i18n";
+  const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   import { playSound } from "../scripts/sound-init";
 
   /** live HH:MM:SS in a given IANA timezone; paused when hidden. */
@@ -254,6 +268,12 @@ import UiIcon from "./icons/UiIcon.astro";
         a.addEventListener("click", () => playSound("click"));
       }
 
+      const onLanguage = () => this.setMobileOpen(false);
+      this.querySelectorAll("[data-language-switch]").forEach((link) => {
+        link.addEventListener("click", onLanguage);
+        this.cleanupFns.push(() => link.removeEventListener("click", onLanguage));
+      });
+
       // ── mobile clock ──────────────────────────────────────────────
       if (clock) {
         const tz =
@@ -312,7 +332,7 @@ import UiIcon from "./icons/UiIcon.astro";
       const backdrop = this.querySelector<HTMLButtonElement>(".nav-backdrop");
       if (burger) {
         burger.setAttribute("aria-expanded", String(open));
-        burger.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+        burger.setAttribute("aria-label", t(open ? "Close menu" : "Open menu"));
         burger.classList.toggle("is-open", open);
       }
       if (panel) panel.hidden = !open;

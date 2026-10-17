@@ -1,9 +1,14 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 /** Shared site sound-effects control for desktop and mobile navigation. */
 import UiIcon from "./icons/UiIcon.astro";
 
 interface Props { instance: "desktop" | "mobile"; }
 const { instance } = Astro.props;
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
 ---
 
 <sound-volume class="sv-root pointer-events-auto relative block shrink-0" data-open="false" data-on="false">
@@ -11,7 +16,7 @@ const { instance } = Astro.props;
     <button
       type="button"
       class="sv-button"
-      aria-label="Turn site sound effects on"
+      aria-label={t("Turn site sound effects on")}
       aria-pressed="false"
       aria-expanded="false"
       aria-controls={`sound-volume-panel-${instance}`}
@@ -20,7 +25,7 @@ const { instance } = Astro.props;
       <UiIcon name="volume-x" size={17} class="sv-icon-off" />
     </button>
 
-    <div id={`sound-volume-panel-${instance}`} class="sv-controls" role="group" aria-label="Site sound effects volume">
+    <div id={`sound-volume-panel-${instance}`} class="sv-controls" role="group" aria-label={t("Site sound effects volume")}>
       <input
         class="sv-range"
         type="range"
@@ -28,7 +33,7 @@ const { instance } = Astro.props;
         max="100"
         step="1"
         value="75"
-        aria-label="Site sound effects volume"
+        aria-label={t("Site sound effects volume")}
       />
       <output class="sv-value">75%</output>
     </div>
@@ -36,6 +41,8 @@ const { instance } = Astro.props;
 </sound-volume>
 
 <script>
+  import { useTranslations } from "../config/i18n";
+  const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   import {
     getSoundVolume,
     isSoundCapableNow,
@@ -65,7 +72,7 @@ const { instance } = Astro.props;
         button.disabled = !capable;
         slider.disabled = !capable;
         button.setAttribute("aria-pressed", String(on));
-        button.setAttribute("aria-label", on ? "Mute site sound effects" : "Turn site sound effects on");
+        button.setAttribute("aria-label", on ? t("Mute site sound effects") : t("Turn site sound effects on"));
         slider.value = String(level);
         slider.style.setProperty("--sv-level", `${level}%`);
         output.value = `${level}%`;

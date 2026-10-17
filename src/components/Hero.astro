@@ -1,4 +1,6 @@
 ---
+import { localeFromPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 /**
  * Hero — centered portrait with a bottom fade mask, a dot field behind,
  * and the greeting text rising out of the portrait's faded bottom.
@@ -28,11 +30,15 @@
  *  while the hero is in view, then scroll away with the hero once you
  *  pass it (instead of lingering forever like true fixed elements).
  */
-import { siteConfig } from "../config/site";
+import { getSiteConfig } from "../config/site";
 import DotField from "./DotField.astro";
 import Greeting from "./Greeting.astro";
 import ScrambleName from "./ScrambleName.astro";
 import HeroJourney from "./HeroJourney.astro";
+
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+const siteConfig = getSiteConfig(locale);
 ---
 
 <hero-section
@@ -135,7 +141,7 @@ import HeroJourney from "./HeroJourney.astro";
           class="hero-gated font-light hf-200-0"
           style="color: var(--ink-soft); font-size: 0.4em; letter-spacing: 0.06em; margin-bottom: 0.25em;"
         >
-          I am
+          {t("I am")}
         </span>
         <!-- name — driven by <scramble-name>, which listens for
              loader:dismiss and starts the scramble 150ms later.
@@ -181,14 +187,14 @@ import HeroJourney from "./HeroJourney.astro";
             <polyline points="7 10 12 15 17 10"></polyline>
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
-          <span>download cv</span>
+          <span>{t("download cv")}</span>
         </a>
         <a
           href="#contact"
           class="group/ct inline-flex items-center gap-2 rounded-[var(--radius-sm)] px-5 py-2.5 font-mono text-xs tracking-[0.06em] text-[var(--bg)] transition-[transform,box-shadow] [transition-duration:var(--transition-fast)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--signal)]/60"
           style="background: var(--ink); box-shadow: 0 6px 20px -8px rgba(255,255,255,0.30);"
         >
-          <span>contact</span>
+          <span>{t("contact")}</span>
           <!-- arrow-down icon (lucide "arrow-down", inlined) -->
           <svg
             width="14"
@@ -217,7 +223,7 @@ import HeroJourney from "./HeroJourney.astro";
     <span class="inline-flex flex-col items-center gap-2.5">
       <span class="flex items-center gap-2">
         <span aria-hidden="true" class="text-[var(--ink-faint)]">[</span>
-        <span>scroll</span>
+        <span>{t("scroll")}</span>
         <span aria-hidden="true" class="text-[var(--ink-faint)]">]</span>
       </span>
       <span class="relative block h-8 w-px overflow-hidden bg-[var(--line)]">

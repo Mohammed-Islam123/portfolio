@@ -405,7 +405,7 @@ class HeroJourneyEl extends HTMLElement {
       slot.card.style.opacity = "0";
       return Promise.resolve();
     }
-    slot.face.setAttribute("aria-label", "View " + item.description);
+    slot.face.setAttribute("aria-label", (this.getAttribute("data-view-label") ?? "View") + " " + item.description);
     const loading = document.createElement("span");
     loading.className = "journey-loading";
     loading.setAttribute("aria-hidden", "true");

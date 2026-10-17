@@ -8,6 +8,8 @@
  *
  * Rendered as a quiet editorial aside: one semantic marker and a reading rail.
  */
+import { useTranslations } from "../../config/i18n";
+import { localeFromPath } from "../../lib/i18n";
 import UiIcon from "../icons/UiIcon.astro";
 interface Props {
   variant?: "note" | "warn" | "tip";
@@ -18,7 +20,8 @@ const details = {
   warn: { label: "warning", icon: "triangle-alert" },
   tip: { label: "practice", icon: "lightbulb" },
 } as const;
-const detail = details[variant];
+const t = useTranslations(localeFromPath(Astro.url.pathname));
+const detail = { ...details[variant], label: t(details[variant].label) };
 ---
 
 <aside class={`mdx-note mdx-note--${variant}`} aria-label={detail.label}>
