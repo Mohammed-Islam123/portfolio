@@ -16,7 +16,7 @@ const tags = collectTags(posts);
 
 ---
 
-<Layout title={t("Tags · Blog · Mohamed Islam")} description={t("Browse blog posts by topic.")}>
+<Layout title={t("Tags · Blog · Mohamed Islam")} description={t("Browse blog posts by topic.")} noindex={tags.length === 0}>
   <BlogBar />
   {tags.length === 0 ? <PageMessage {...pageMessages.tagsEmpty} /> : (
   <main class="tag-page">

@@ -5,8 +5,8 @@
  *
  * The <Loader /> mounts on top (z-[100], fixed) — a terminal-style
  * loading overlay that types `~/mohamed-islam $ whoami` while the
- * page's assets load. When ready (window.load OR 2.2s floor OR 5s
- * timeout), it lifts off and dispatches `loader:dismiss` so the hero
+ * page's assets load. Once typing and window.load (or the 5s safety
+ * timeout) finish, it dispatches `loader:dismiss` so the hero
  * fades in and the name scrambles into place. Transparent overlay —
  * the hero's <DotField /> is visible behind it.
  *
@@ -21,11 +21,34 @@ import Projects from "../components/Projects.astro";
 import Toolkit from "../components/Toolkit.astro";
 // import Values from "../components/Values.astro";
 import Contact from "../components/Contact.astro";
+import { siteConfig } from "../config/site";
+import { localeFromPath, localizedPath } from "../lib/i18n";
+import { useTranslations } from "../config/i18n";
 
+const locale = localeFromPath(Astro.url.pathname);
+const t = useTranslations(locale);
+const url = new URL(localizedPath(locale), Astro.site);
+const profile = {
+  "@context": "https://schema.org",
+  "@type": "ProfilePage",
+  "@id": `${url.href}#profile`,
+  url: url.href,
+  inLanguage: locale,
+  mainEntity: {
+    "@type": "Person",
+    "@id": new URL("/#person", Astro.site).href,
+    name: siteConfig.fullName,
+    url: new URL("/", Astro.site).href,
+    jobTitle: t(siteConfig.role),
+    image: new URL("/portrait-about.webp", Astro.site).href,
+    sameAs: siteConfig.socialProfiles.filter(({ icon }) => icon === "github" || icon === "linkedin").map(({ href }) => href),
+  },
+};
 
 ---
 
 <Layout>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(profile).replace(/</g, "\\u003c")} />
   <div class="relative flex min-h-[100svh] flex-col">
     <NavBar />
     <main class="flex-1">

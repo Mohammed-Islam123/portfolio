@@ -2,6 +2,7 @@
 import { localeFromPath, localizedPath, locales, type Locale } from "../lib/i18n";
 import { useTranslations } from "../config/i18n";
 import { portfolioCopy } from "../config/portfolio";
+import { siteConfig } from "../config/site";
 import { ClientRouter } from "astro:transitions";
 import Loader from "../components/Loader.astro";
 import RouteLoader from "../components/RouteLoader.astro";
@@ -12,6 +13,7 @@ interface Props {
   canonicalPath?: string;
   availableLocales?: Locale[];
   description?: string;
+  noindex?: boolean;
   loading?: {
     mode: "home" | "article" | "generic";
     slug?: string;
@@ -24,12 +26,13 @@ const {
   canonicalPath = Astro.url.pathname,
   availableLocales = [...locales],
   title = `Mohamed Islam — ${t("Backend Engineer")}`,
-  description = t(portfolioCopy.bio),
+  description = t(portfolioCopy.description),
+  noindex = false,
   loading = localizedPath("en", Astro.url.pathname) === "/" ? { mode: "home" } : false,
 } = Astro.props;
 
 const canonical = new URL(canonicalPath, Astro.site);
-const ogImage = new URL("/og.png", Astro.site);
+const ogImage = new URL("/portrait-about.webp", Astro.site);
 ---
 
 <html lang={locale}>
@@ -38,13 +41,14 @@ const ogImage = new URL("/og.png", Astro.site);
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex, follow" />}
     <meta
       name="keywords"
       content="backend engineer, system design, distributed systems, C#, .NET, Astro, portfolio"
     />
-    <meta name="author" content="Mohamed Islam Benyahkem" />
+    <meta name="author" content={siteConfig.fullName} />
     <link rel="canonical" href={canonical} />
-    {availableLocales.map((lang) => <link rel="alternate" hreflang={lang} href={new URL(localizedPath(lang, canonicalPath), Astro.site)} />)}
+    {!noindex && availableLocales.map((lang) => <link rel="alternate" hreflang={lang} href={new URL(localizedPath(lang, canonicalPath), Astro.site)} />)}
     <meta property="og:locale" content={locale === "fr" ? "fr_FR" : "en_GB"} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link
@@ -59,10 +63,14 @@ const ogImage = new URL("/og.png", Astro.site);
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImage} />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:image:width" content="300" />
+    <meta property="og:image:height" content="300" />
+    <meta property="og:image:alt" content={siteConfig.fullName} />
+    <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={siteConfig.fullName} />
 
     <ClientRouter />
 

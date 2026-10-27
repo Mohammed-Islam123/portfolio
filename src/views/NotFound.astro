@@ -12,7 +12,7 @@ const locale = localeFromPath(Astro.url.pathname);
 const t = useTranslations(locale);
 ---
 
-<Layout title={`${t("Page not found")} · ${siteConfig.name}`} description={t(pageMessages.notFound.description)}>
+<Layout title={`${t("Page not found")} · ${siteConfig.name}`} description={t(pageMessages.notFound.description)} noindex>
   <BlogBar />
   <PageMessage {...pageMessages.notFound} />
 </Layout>

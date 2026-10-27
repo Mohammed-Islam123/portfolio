@@ -16,7 +16,7 @@ const posts = postsForTag(await getPosts(locale), tag ?? "");
 
 ---
 
-<Layout title={`${name} · Blog · Mohamed Islam`} description={`${t("Posts about")} ${name}.`}>
+<Layout title={`${name} · Blog · Mohamed Islam`} description={`${t("Posts about")} ${name}.`} noindex={posts.length === 0}>
   <BlogBar />
   <main class="tag-detail">
     <div class="wrap tag-detail__inner">

@@ -19,6 +19,7 @@ const posts = await getPosts(locale);
 <Layout
   title={t("Blog · Mohamed Islam")}
   description={t("Backend notes — protocols, data paths, and the habits that keep systems honest.")}
+  noindex={posts.length === 0}
 >
   <BlogBar />
   {posts.length === 0 ? <PageMessage {...pageMessages.blogEmpty} /> : (

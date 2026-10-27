@@ -48,7 +48,7 @@ test("duplicate translations fail instead of silently selecting a file", () => {
 });
 
 test("portfolio descriptions and toolkit notes all have French translations", () => {
-  const source = [portfolioCopy.bio, ...projects.map((p) => p.description), ...Object.values(technologies).flatMap((t) => t.description ? [t.description] : []), ...toolGroups.map((g) => g.label)];
+  const source = [portfolioCopy.bio, portfolioCopy.description, ...projects.map((p) => p.description), ...Object.values(technologies).flatMap((t) => t.description ? [t.description] : []), ...toolGroups.map((g) => g.label)];
   for (const text of source) assert.ok(Object.hasOwn(french, text), `Missing French copy: ${text}`);
   assert.equal(useTranslations("en")("Read more"), "Read more");
   assert.equal(useTranslations("fr")("Read more"), "Lire la suite");

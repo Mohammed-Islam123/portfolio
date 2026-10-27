@@ -5,6 +5,17 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Keep compact navigation surfaces while providing 44px hit areas. */
+.nav-blog-mobile, .nav-burger, .blog-bar-chip {
+  position: relative;
+}
+.nav-blog-mobile::after, .nav-burger::after, .blog-bar-chip::after, .theme-toggle-btn::after {
+  content: "";
+  position: absolute;
+  inset-block: -4px;
+  inset-inline: -4px;
+}
+
 /*
  * ──────────────────────────────────────────────────────────────────────────
  *  DESIGN TOKENS — "Engineered Calm" (dark-first, near-monochrome + amber)

@@ -51,7 +51,6 @@ const t = useTranslations(locale);
 </boot-loader>
 
 <script>
-  const MINIMUM_VISIBLE_DURATION = 2000;
   let activeLoader: BootLoader | undefined;
 
   class BootLoader extends HTMLElement {
@@ -62,7 +61,6 @@ const t = useTranslations(locale);
     private ready = false;
     private typed = false;
     private dismissed = false;
-    private mountedAt = 0;
 
     private later(delay: number, action: () => void) {
       const timer = window.setTimeout(action, delay);
@@ -76,7 +74,6 @@ const t = useTranslations(locale);
       activeLoader?.cancel();
       activeLoader = this;
 
-      this.mountedAt = performance.now();
       document.documentElement.dataset.loaderState = "loading";
       document.documentElement.classList.add("loader-scroll-lock");
       window.dispatchEvent(
@@ -126,11 +123,7 @@ const t = useTranslations(locale);
 
     private dismissWhenReady() {
       if (this.dismissed || !this.ready || !this.typed) return;
-      const elapsed = performance.now() - this.mountedAt;
-      this.later(
-        Math.max(0, MINIMUM_VISIBLE_DURATION - elapsed),
-        () => this.dismiss(),
-      );
+      this.dismiss();
     }
 
     private markCommandComplete() {

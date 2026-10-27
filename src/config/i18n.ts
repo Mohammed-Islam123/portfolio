@@ -10,6 +10,7 @@ export const french = {
   "note": "note", "warning": "attention", "practice": "conseil",
   "contents": "sommaire", "Code copied": "Code copié", "Open image:": "Ouvrir l'image :", "article image": "image de l'article",
   "Backend Engineer": "Ingénieur Backend",
+  "Mohamed Islam Benyahkem, backend engineer working with C# and .NET. Explore software, IoT and robotics projects, source code and contact details.": "Mohamed Islam Benyahkem, ingénieur backend C# et .NET. Découvrez mes projets logiciels, IoT et robotiques, leur code source et mes coordonnées.",
   "back-end engineering · system design · distributed systems": "développement backend · conception de systèmes · systèmes distribués",
   "open to work": "à l'écoute d'opportunités",
   "about": "à propos", "projects": "projets", "toolkit": "outils", "contact": "contact",
