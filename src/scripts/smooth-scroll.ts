@@ -14,7 +14,10 @@ if (typeof window !== "undefined" && !initialized) {
     if (motion.matches || !desktop.matches || lenis) return;
     lenis = new Lenis({
       autoRaf: true,
-      prevent: (node) => Boolean(node.closest("[data-lenis-prevent], pre")),
+      virtualScroll: ({ deltaX, deltaY, event }) => !(
+        event.target instanceof Element && event.target.closest("pre") &&
+        (event.shiftKey || Math.abs(deltaX) > Math.abs(deltaY))
+      ),
     });
     if (document.documentElement.dataset.loaderState === "loading") lenis.stop();
   };
@@ -57,9 +60,9 @@ if (typeof window !== "undefined" && !initialized) {
     if (!target) return;
 
     event.preventDefault();
-    history.replaceState(null, "", url.hash);
+    history.replaceState(history.state, "", url.hash);
     if (lenis) {
-      lenis.scrollTo(target, { duration: 1.1, lock: true });
+      lenis.scrollTo(target, { duration: 1.1 });
     } else {
       target.scrollIntoView({ behavior: motion.matches ? "auto" : "smooth", block: "start" });
     }

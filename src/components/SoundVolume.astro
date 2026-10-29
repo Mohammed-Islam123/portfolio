@@ -3,6 +3,7 @@ import { localeFromPath } from "../lib/i18n";
 import { useTranslations } from "../config/i18n";
 /** Shared site sound-effects control for desktop and mobile navigation. */
 import UiIcon from "./icons/UiIcon.astro";
+import { defaultSoundVolume } from "../config/sound";
 
 interface Props { instance: "desktop" | "mobile"; }
 const { instance } = Astro.props;
@@ -16,8 +17,7 @@ const t = useTranslations(locale);
     <button
       type="button"
       class="sv-button"
-      aria-label={t("Turn site sound effects on")}
-      aria-pressed="false"
+      aria-label={t("Site sound effects volume")}
       aria-expanded="false"
       aria-controls={`sound-volume-panel-${instance}`}
     >
@@ -32,10 +32,14 @@ const t = useTranslations(locale);
         min="0"
         max="100"
         step="1"
-        value="75"
+        value={defaultSoundVolume}
         aria-label={t("Site sound effects volume")}
       />
-      <output class="sv-value">75%</output>
+      <output class="sv-value">{defaultSoundVolume}%</output>
+      <button type="button" class="sv-mute" aria-label={t("Turn site sound effects on")} aria-pressed="false">
+        <UiIcon name="volume-2" size={17} class="sv-icon-on" />
+        <UiIcon name="volume-x" size={17} class="sv-icon-off" />
+      </button>
     </div>
   </div>
 </sound-volume>
@@ -59,9 +63,11 @@ const t = useTranslations(locale);
     connectedCallback() {
       const button = this.querySelector<HTMLButtonElement>(".sv-button");
       const slider = this.querySelector<HTMLInputElement>(".sv-range");
+      const mute = this.querySelector<HTMLButtonElement>(".sv-mute");
       const output = this.querySelector<HTMLOutputElement>(".sv-value");
       const controls = this.querySelector<HTMLElement>(".sv-controls");
-      if (!button || !slider || !output || !controls) return;
+      if (!button || !slider || !mute || !output || !controls) return;
+      controls.inert = true;
       let pointerFocused = false;
 
       const render = () => {
@@ -71,8 +77,9 @@ const t = useTranslations(locale);
         this.dataset.on = String(on);
         button.disabled = !capable;
         slider.disabled = !capable;
-        button.setAttribute("aria-pressed", String(on));
-        button.setAttribute("aria-label", on ? t("Mute site sound effects") : t("Turn site sound effects on"));
+        mute.disabled = !capable;
+        mute.setAttribute("aria-pressed", String(on));
+        mute.setAttribute("aria-label", on ? t("Mute site sound effects") : t("Turn site sound effects on"));
         slider.value = String(level);
         slider.style.setProperty("--sv-level", `${level}%`);
         output.value = `${level}%`;
@@ -80,6 +87,14 @@ const t = useTranslations(locale);
       const setOpen = (open: boolean) => {
         this.dataset.open = String(open);
         button.setAttribute("aria-expanded", String(open));
+        controls.inert = !open;
+        if (open) {
+          const rect = this.getBoundingClientRect();
+          const width = controls.offsetWidth;
+          const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+          const start = getComputedStyle(this).direction === "rtl" ? rect.right - left - width : left - rect.left;
+          controls.style.setProperty("--sv-panel-start", `${start}px`);
+        }
       };
       const onEnter = (event: PointerEvent) => {
         if (event.pointerType === "mouse") setOpen(true);
@@ -93,7 +108,9 @@ const t = useTranslations(locale);
         if (!this.contains(document.activeElement)) setOpen(false);
       };
       const onPointerDown = () => { pointerFocused = true; };
-      const onFocusIn = () => setOpen(true);
+      const onFocusIn = (event: FocusEvent) => {
+        if (!pointerFocused && event.target !== button) setOpen(true);
+      };
       const onFocusOut = (event: FocusEvent) => {
         if (!this.contains(event.relatedTarget as Node | null) && !this.matches(":hover")) {
           setOpen(false);
@@ -109,12 +126,11 @@ const t = useTranslations(locale);
         if (this.contains(event.target as Node)) pointerFocused = false;
         if (event.key !== "Escape" || this.dataset.open !== "true") return;
         setOpen(false);
-        if (this.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+        if (this.contains(document.activeElement)) button.focus({ preventScroll: true });
         event.stopPropagation();
       };
       const onClick = () => {
-        toggleSound();
-        setOpen(true);
+        setOpen(this.dataset.open !== "true");
       };
       const onInput = () => setSoundVolume(slider.valueAsNumber);
       const onChange = () => {
@@ -129,9 +145,12 @@ const t = useTranslations(locale);
       document.addEventListener("pointerdown", onOutside);
       document.addEventListener("keydown", onKey);
       button.addEventListener("click", onClick);
+      mute.addEventListener("click", toggleSound);
       slider.addEventListener("input", onInput);
       slider.addEventListener("change", onChange);
       window.addEventListener(SOUND_SYNC_EVENT, render);
+      const onResize = () => { if (this.dataset.open === "true") setOpen(true); };
+      window.addEventListener("resize", onResize);
       render();
 
       this.cleanupFns.push(() => {
@@ -143,9 +162,11 @@ const t = useTranslations(locale);
         document.removeEventListener("pointerdown", onOutside);
         document.removeEventListener("keydown", onKey);
         button.removeEventListener("click", onClick);
+        mute.removeEventListener("click", toggleSound);
         slider.removeEventListener("input", onInput);
         slider.removeEventListener("change", onChange);
         window.removeEventListener(SOUND_SYNC_EVENT, render);
+        window.removeEventListener("resize", onResize);
       });
     }
 
@@ -163,42 +184,37 @@ const t = useTranslations(locale);
 <style>
   .sv-root {
     --sv-size: 46px;
-    --sv-button-size: 36px;
-    width: var(--sv-size);
-    height: var(--sv-size);
+    inline-size: var(--sv-size);
+    block-size: var(--sv-size);
     z-index: 1;
   }
   .sv-root[data-open="true"] { z-index: 3; }
   .sv-shell {
     position: absolute;
-    top: 0;
-    left: 0;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: flex-start;
     box-sizing: border-box;
-    width: var(--sv-size);
-    height: var(--sv-size);
-    padding: 4px;
-    overflow: hidden;
+    inline-size: var(--sv-size);
+    block-size: var(--sv-size);
     border: 1px solid var(--line-soft);
     border-radius: 10px;
-    transition: width 340ms var(--ease), border-color var(--transition-fast),
+    transition: border-color var(--transition-fast),
       box-shadow var(--transition);
   }
   .sv-root[data-open="true"] .sv-shell {
-    width: 216px;
     border-color: var(--line-strong);
     box-shadow: var(--glass-inset), 0 14px 32px -18px var(--ink-dim);
   }
-  .sv-button {
+  .sv-button, .sv-mute {
     position: relative;
     z-index: 1;
     display: grid;
     flex: none;
     place-items: center;
-    width: var(--sv-button-size);
-    height: var(--sv-button-size);
+    inline-size: 44px;
+    block-size: 44px;
     padding: 0;
     border: 0;
     border-radius: 8px;
@@ -207,45 +223,60 @@ const t = useTranslations(locale);
     cursor: pointer;
     transition: color var(--transition-fast), background-color var(--transition-fast);
   }
-  .sv-button:hover, .sv-root[data-open="true"] .sv-button {
+  .sv-button:hover, .sv-mute:hover, .sv-root[data-open="true"] .sv-button {
     color: var(--ink);
     background: var(--surface-2);
   }
-  .sv-button:focus-visible { outline: 2px solid var(--signal); outline-offset: -3px; }
-  .sv-button:disabled { cursor: not-allowed; opacity: 0.5; }
+  .sv-button:focus-visible, .sv-mute:focus-visible { outline: 2px solid var(--signal); outline-offset: -3px; }
+  .sv-button:disabled, .sv-mute:disabled { cursor: not-allowed; opacity: 0.5; }
   .sv-root[data-on="true"] :global(.sv-icon-off),
   .sv-root[data-on="false"] :global(.sv-icon-on) { display: none; }
   .sv-controls {
     position: absolute;
-    inset: 0 13px 0 48px;
+    inset-block-start: calc(100% + 8px);
+    inset-inline-start: var(--sv-panel-start, 0px);
+    box-sizing: border-box;
+    inline-size: min(17rem, calc(100vw - 1.5rem));
+    padding: 8px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 14px 32px -18px var(--ink-dim);
     display: flex;
     align-items: center;
     gap: 9px;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transform: translateX(-9px);
+    transform: translateY(-6px);
     transition: opacity 170ms var(--ease), transform 280ms var(--ease), visibility 170ms;
   }
   .sv-root[data-open="true"] .sv-controls {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    transform: translateX(0);
+    transform: translateY(0);
+  }
+  .sv-controls::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 100%;
+    block-size: 10px;
   }
   .sv-value {
     flex: none;
-    width: 34px;
+    inline-size: 34px;
     color: var(--ink);
     font: 500 10px/1 var(--font-mono);
     font-variant-numeric: tabular-nums;
-    text-align: right;
+    text-align: end;
   }
   .sv-range {
     display: block;
     flex: 1;
-    min-width: 0;
-    height: 18px;
+    min-inline-size: 44px;
+    block-size: 44px;
     margin: 0;
     padding: 0;
     background: transparent;
@@ -287,14 +318,9 @@ const t = useTranslations(locale);
   }
   .sv-range:hover::-webkit-slider-thumb { transform: scale(1.15); }
   .sv-range:hover::-moz-range-thumb { transform: scale(1.15); }
-  @media (max-width: 767px) {
-    .sv-root { --sv-size: 36px; --sv-button-size: 34px; }
-    .sv-shell { padding: 0; }
-    .sv-root[data-open="true"] .sv-shell { width: 190px; }
-    .sv-controls { right: 10px; left: 40px; gap: 6px; }
-  }
   @media (prefers-reduced-motion: reduce) {
     .sv-button,
+    .sv-mute,
     .sv-shell,
     .sv-controls,
     .sv-range::-webkit-slider-thumb,

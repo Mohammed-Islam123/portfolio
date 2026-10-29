@@ -1,25 +1,13 @@
 ---
-/**
- * Landing — single-page portfolio.
- * Order: Hero → About → Projects → Toolkit → Values → Contact.
- *
- * The <Loader /> mounts on top (z-[100], fixed) — a terminal-style
- * loading overlay that types `~/mohamed-islam $ whoami` while the
- * page's assets load. Once typing and window.load (or the 5s safety
- * timeout) finish, it dispatches `loader:dismiss` so the hero
- * fades in and the name scrambles into place. Transparent overlay —
- * the hero's <DotField /> is visible behind it.
- *
- * The root wrapper uses min-h-screen + flex-col so the footer sticks
- * to the bottom on short content and pushes down naturally on long.
- */
+
 import Layout from "../layouts/Layout.astro";
 import NavBar from "../components/NavBar.astro";
 import Hero from "../components/Hero.astro";
 import About from "../components/About.astro";
 import Projects from "../components/Projects.astro";
 import Toolkit from "../components/Toolkit.astro";
-// import Values from "../components/Values.astro";
+import ArticleTools from "../components/ArticleTools.astro";
+
 import Contact from "../components/Contact.astro";
 import { siteConfig } from "../config/site";
 import { localeFromPath, localizedPath } from "../lib/i18n";
@@ -56,8 +44,9 @@ const profile = {
       <About />
       <Projects />
       <Toolkit />
-      {/* Values section hidden for now */}
+
     </main>
     <Contact />
   </div>
+  <ArticleTools />
 </Layout>

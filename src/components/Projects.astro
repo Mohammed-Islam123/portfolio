@@ -130,7 +130,7 @@ const count = projects.length;
             data-view-toggle
             aria-controls="project-list"
             aria-pressed="false"
-            class="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 font-mono text-xs text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)]"
+            class="inline-flex h-11 items-center gap-1.5 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 font-mono text-xs text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)]"
           >
             <span data-view-icon="list"><UiIcon name="list" size={14} /></span>
             <span data-view-icon="carousel" hidden><UiIcon name="layout-grid" size={14} /></span>
@@ -141,7 +141,7 @@ const count = projects.length;
             type="button"
             data-arrow="left"
             aria-label={t("previous")}
-            class="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
+            class="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
           >
             <svg
               width="16"
@@ -163,7 +163,7 @@ const count = projects.length;
             type="button"
             data-arrow="right"
             aria-label={t("next")}
-            class="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
+            class="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--line)] bg-[var(--surface)] text-[var(--ink-muted)] transition-colors [transition-duration:var(--transition-fast)] hover:border-[var(--ink-muted)] hover:text-[var(--ink)] disabled:opacity-30 disabled:pointer-events-none"
           >
             <svg
               width="16"
@@ -570,6 +570,7 @@ const count = projects.length;
           descriptions.set(article, { viewport, paragraph, toggle, lines, expanded: false });
           toggle.addEventListener("click", (event) => {
             event.stopPropagation();
+            playSound("click");
             setExpanded(article, !descriptions.get(article)?.expanded);
           }, { signal: events.signal });
         });
@@ -643,9 +644,26 @@ const count = projects.length;
         listCards.forEach((card) => listObserver?.observe(card));
       };
 
-      const animateCarouselCards = () => {
-        this.carouselAnimations.forEach((animation) => animation.cancel());
+      const cancelCarouselEntrance = () => {
+        let committed = false;
+        this.carouselAnimations.forEach((animation) => {
+          const target = (animation.effect as KeyframeEffect | null)?.target;
+          if (animation.playState === "running" && target instanceof HTMLElement && target.getClientRects().length) {
+            animation.commitStyles();
+            committed = true;
+          }
+          animation.cancel();
+        });
         this.carouselAnimations = [];
+        // Commit the interrupted frame before CSS transitions receive a new target.
+        if (committed && stage) {
+          void stage.offsetWidth;
+          render();
+        }
+      };
+
+      const animateCarouselCards = () => {
+        cancelCarouselEntrance();
         if (motionPreference.matches) return;
 
         cards.forEach((card, index) => {
@@ -675,6 +693,9 @@ const count = projects.length;
       };
 
       const setView = (view: "carousel" | "list") => {
+        this.animationFrames.forEach(cancelAnimationFrame);
+        this.animationFrames = [];
+        cancelCarouselEntrance();
         descriptions.forEach((state, article) => {
           if (state.expanded) setExpanded(article, false);
         });
@@ -743,6 +764,7 @@ const count = projects.length;
       const goTo = (i: number, withSound = true) => {
         const next = clamp(i);
         if (next !== this.active) {
+          cancelCarouselEntrance();
           if (withSound) playSound("click");
           if (descriptions.get(cards[this.active])?.expanded) {
             setExpanded(cards[this.active], false);
@@ -761,6 +783,9 @@ const count = projects.length;
         setView(this.view === "carousel" ? "list" : "carousel");
         playSound("click");
       }, { signal: events.signal });
+      this.querySelectorAll<HTMLAnchorElement>("a").forEach((link) => {
+        link.addEventListener("click", () => playSound("click"), { signal: events.signal });
+      });
       listScroll?.addEventListener("scroll", updateListCue, { passive: true, signal: events.signal });
       this.cleanupFns.push(() => {
         listObserver?.disconnect();
@@ -783,12 +808,14 @@ const count = projects.length;
       }
       document.addEventListener("visibilitychange", scheduleAutoplay, { signal: events.signal });
       motionPreference.addEventListener("change", () => {
+        if (motionPreference.matches) cancelCarouselEntrance();
         render();
         scheduleAutoplay();
       }, { signal: events.signal });
       this.addEventListener("focusin", scheduleAutoplay, { signal: events.signal });
       this.addEventListener("focusout", () => queueMicrotask(scheduleAutoplay), { signal: events.signal });
       window.addEventListener("resize", () => {
+        cancelCarouselEntrance();
         cards.forEach(measureDescription);
         if (this.view === "list") listCards.forEach(measureDescription);
         updateStageHeight();
@@ -841,7 +868,8 @@ const count = projects.length;
           hoveredCards.delete(card);
           scheduleAutoplay();
         }, { signal: events.signal });
-        card.addEventListener("click", () => {
+        card.addEventListener("click", (event) => {
+          if ((event.target as Element).closest("a")) return;
           if (i !== this.active) goTo(i);
         }, { signal: events.signal });
       });

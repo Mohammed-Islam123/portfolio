@@ -13,6 +13,7 @@ const describe = (name: string) =>
 const media: HeroJourneyMedia[] = heroJourneyDetails.map((item) => ({
   type: "image",
   source: `/Images/Hero/${item.file}`,
+  thumbnail: `/Images/Hero/thumbnails/${item.file}`,
   description: item.description ?? describe(item.file),
   caption: item.caption,
   cropPosition: item.cropPosition,
@@ -32,10 +33,12 @@ const t = useTranslations(locale);
     aria-label={t("Project media fragments")}
   >
     <dialog class="journey-viewer" aria-label={t("Expanded hero photo")} data-lenis-prevent>
-      <button class="journey-viewer-close" type="button" aria-label={t("Close expanded photo")} autofocus>
-        <UiIcon name="close" size={22} />
-      </button>
-      <div class="journey-viewer-content"></div>
+      <div class="journey-viewer-panel">
+        <button class="journey-viewer-close" type="button" aria-label={t("Close expanded photo")} autofocus>
+          <UiIcon name="close" size={22} />
+        </button>
+        <figure class="journey-viewer-content"></figure>
+      </div>
     </dialog>
   </hero-journey>
 )}
@@ -51,10 +54,12 @@ const t = useTranslations(locale);
   }
 
   .hero-journey :global(.journey-card) {
-    --card-width: clamp(108px, 10vw, 146px);
+    --card-width: clamp(68px, 20vw, 84px);
     position: absolute;
-    left: 0;
-    top: 0;
+    /* Path coordinates are measured from the physical viewport origin. */
+    direction: ltr;
+    inset-inline-start: 0;
+    inset-block-start: 0;
     width: var(--card-width);
     aspect-ratio: 4 / 3;
     pointer-events: auto;
@@ -88,7 +93,7 @@ const t = useTranslations(locale);
     background: var(--surface-2);
     box-shadow: 0 10px 30px -14px rgb(0 0 0 / 0.55);
     cursor: zoom-in;
-    text-align: left;
+    text-align: start;
     transition: box-shadow 320ms var(--ease);
   }
 
@@ -104,12 +109,6 @@ const t = useTranslations(locale);
     height: 100%;
     object-fit: cover;
     border-radius: var(--radius-sm);
-    filter: blur(0.5px);
-    transition: filter 320ms var(--ease);
-  }
-
-  .hero-journey :global(.journey-card[data-expanded="true"] .journey-media) {
-    filter: none;
   }
 
   .hero-journey :global(.journey-loading) {
@@ -135,34 +134,17 @@ const t = useTranslations(locale);
     display: none;
   }
 
-  .hero-journey :global(.journey-caption) {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    padding: 16px 8px 7px;
-    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-    background: linear-gradient(transparent, rgb(0 0 0 / 0.78));
-    color: white;
-    font: 500 10px/1.3 var(--font-mono);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 220ms var(--ease);
-  }
-
-  .hero-journey :global(.journey-card[data-expanded="true"] .journey-caption) {
-    opacity: 1;
-  }
-
   .journey-viewer {
-    width: min(94vw, 80rem, calc((100svh - 6rem) * var(--viewer-ratio)));
-    height: auto;
-    aspect-ratio: var(--viewer-ratio);
-    max-width: none;
-    max-height: none;
-    margin: auto;
+    position: fixed;
+    inset: 0;
+    inline-size: 100%;
+    block-size: 100%;
+    max-inline-size: none;
+    max-block-size: none;
+    margin: 0;
     padding: 0;
-    overflow: visible;
+    overflow: hidden;
+    contain: layout;
     border: 0;
     border-radius: var(--radius-sm);
     background: transparent;
@@ -175,30 +157,61 @@ const t = useTranslations(locale);
     backdrop-filter: blur(5px);
   }
 
+  :global(html) {
+    scrollbar-gutter: stable;
+  }
+
   :global(html:has(.journey-viewer[open])) {
     overflow: hidden;
   }
 
+  .journey-viewer-panel {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    inline-size: min(calc(100vw - 2rem), 80rem, calc((100svh - 8rem) * var(--viewer-ratio)));
+    aspect-ratio: var(--viewer-ratio);
+    margin-inline: auto;
+    transform: translateY(-50%);
+  }
+
   .journey-viewer-content {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    overflow: hidden;
+    border-radius: var(--radius-sm);
   }
 
   .journey-viewer :global(.journey-viewer-media) {
     display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    inline-size: 100%;
+    block-size: 100%;
+    object-fit: contain;
     border-radius: var(--radius-sm);
+  }
+
+  .journey-viewer :global(.journey-viewer-caption) {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    padding-block: 2.5rem 0.875rem;
+    padding-inline: 1rem;
+    background: linear-gradient(to top, rgb(0 0 0 / 0.95), rgb(0 0 0 / 0.8) 55%, transparent);
+    color: white;
+    font: 400 0.875rem/1.5 var(--font-sans);
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 
   .journey-viewer-close {
     position: absolute;
-    top: -44px;
-    right: 0.5rem;
+    z-index: 1;
+    inset-block-start: -48px;
+    inset-inline-end: 0.5rem;
     display: grid;
-    width: 40px;
-    height: 40px;
+    inline-size: 44px;
+    block-size: 44px;
     place-items: center;
     border: 0;
     border-radius: 50%;
@@ -209,17 +222,17 @@ const t = useTranslations(locale);
 
   @keyframes journey-spin { to { transform: rotate(1turn); } }
 
-  @media (max-width: 1023px) {
+  @media (min-width: 640px) {
     .hero-journey :global(.journey-card) { --card-width: clamp(94px, 13vw, 124px); }
   }
 
-  @media (max-width: 639px) {
-    .hero-journey :global(.journey-card) { --card-width: clamp(68px, 20vw, 84px); }
-    .hero-journey :global(.journey-caption) { font-size: 8px; }
+  @media (min-width: 1024px) {
+    .hero-journey :global(.journey-card) { --card-width: clamp(108px, 10vw, 146px); }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .hero-journey :global(.journey-loading::after) { animation: none; }
-    .hero-journey :global(.journey-media) { filter: none; }
+    .hero-journey :global(.journey-card),
+    .hero-journey :global(.journey-face) { transition: none; }
   }
 </style>

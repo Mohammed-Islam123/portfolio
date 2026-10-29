@@ -107,13 +107,7 @@ export const projects: Project[] = [
       "arduino",
       "sbus",
     ],
-    links: [
-      {
-        label: "source",
-        href: "https://github.com/Mohammed-Islam123/Afrobot_Fighting_Robot",
-        kind: "repo",
-      },
-    ],
+    links: [],
     accent: "#F97316",
   },
   {
@@ -134,8 +128,8 @@ export const projects: Project[] = [
     accent: "#38BDF8",
   },
   {
-    slug: "zmala-system",
-    title: "Zmala System",
+    slug: "house-arrest-bracelet",
+    title: "House arrest Bracelet",
     year: "2024",
     description:
       "A house arrest tracking bracelet that transmits location telemetry, communicates, and triggers an alarm when the wearer leaves the designated area.",
@@ -147,10 +141,7 @@ export const projects: Project[] = [
       "mqtt",
       "platformio",
     ],
-    links: [
-      { label: "ESP8266 firmware", href: "https://github.com/Mohammed-Islam123/Tracking_Braclet", kind: "repo" },
-      { label: "ESP32 firmware", href: "https://github.com/Mohammed-Islam123/Ankle_Tracking_Braclet_esp32", kind: "repo" },
-    ],
+    links: [],
     accent: "#F59E0B",
   },
 ];

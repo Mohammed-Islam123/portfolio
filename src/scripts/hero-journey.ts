@@ -1,9 +1,14 @@
 import type { HeroJourneyMedia } from "../config/heroJourney";
+import { playSound } from "./sound-init";
 
 interface JourneySlot {
   card: HTMLDivElement;
   face: HTMLButtonElement;
-  index: number;
+  side: number;
+  lane: number;
+  bend: number;
+  drift: number;
+  tilt: number;
   progress: number;
   duration: number;
   generation: number;
@@ -15,6 +20,15 @@ interface JourneySlot {
   pinned: boolean;
   dismissed: boolean;
   settleTimer: number;
+}
+
+interface ViewerOrigin {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  rotation: number;
+  opacity: number;
 }
 
 const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -38,6 +52,9 @@ class HeroJourneyEl extends HTMLElement {
   private visible = false;
   private frame = 0;
   private lastFrame = 0;
+  private elapsed = 0;
+  private nextSpawn = 0;
+  private geometry: { rect: DOMRect; portrait?: DOMRect; cardWidth: number; safeBottom: number } | null = null;
   private revealTimer = 0;
   private mountVersion = 0;
   private pointerX = 0;
@@ -86,18 +103,32 @@ class HeroJourneyEl extends HTMLElement {
     this.cleanupFns.push(() => visibilityObserver.disconnect());
 
     const resizeObserver = new ResizeObserver(() => {
-      if (this.ready) this.layout();
+      if (this.ready) {
+        // A resized destination invalidates an in-flight return animation.
+        if (this.viewerSlot) {
+          this.viewerAnimation?.cancel();
+          this.viewerAnimation = null;
+          this.querySelector<HTMLDialogElement>(".journey-viewer")?.close();
+        }
+        this.layout();
+      }
     });
     resizeObserver.observe(this);
     this.cleanupFns.push(() => resizeObserver.disconnect());
 
     const onVisibility = () => this.syncActivity();
     const onMotion = () => {
+      if (motionQuery.matches) {
+        this.viewerAnimation?.cancel();
+        this.viewerAnimation = null;
+        if (this.viewerClosing) viewer.close();
+        this.slots.forEach((slot) => this.planPath(slot));
+      }
       this.layout();
       this.syncActivity();
     };
     const onPointerMove = (event: PointerEvent) => {
-      if (event.pointerType !== "mouse" || motionQuery.matches) return;
+      if (event.pointerType !== "mouse" || motionQuery.matches || this.viewerSlot || !this.visible) return;
       const rect = this.getBoundingClientRect();
       this.pointerX = clamp((event.clientX - rect.left) / rect.width * 2 - 1, -1, 1);
       this.pointerY = clamp((event.clientY - rect.top) / rect.height * 2 - 1, -1, 1);
@@ -124,8 +155,13 @@ class HeroJourneyEl extends HTMLElement {
         delete slot.card.dataset.viewing;
         slot.pinned = false;
         slot.dismissed = true;
-        this.syncExpansion(slot);
+        window.clearTimeout(slot.settleTimer);
+        slot.settleTimer = 0;
+        delete slot.card.dataset.settling;
+        slot.card.dataset.expanded = "false";
       }
+      this.render();
+      this.syncActivity();
     };
     viewer.addEventListener("click", onViewerClick);
     viewer.addEventListener("close", onViewerClose);
@@ -159,6 +195,9 @@ class HeroJourneyEl extends HTMLElement {
     cancelAnimationFrame(this.frame);
     this.frame = 0;
     this.lastFrame = 0;
+    this.elapsed = 0;
+    this.nextSpawn = 0;
+    this.geometry = null;
     for (const slot of this.slots) {
       window.clearTimeout(slot.settleTimer);
       slot.generation++;
@@ -178,11 +217,8 @@ class HeroJourneyEl extends HTMLElement {
   private initialize() {
     if (!this.isConnected || this.ready) return;
     this.ready = true;
-    this.layout();
+    const initialLoads = this.layout();
     const version = this.mountVersion;
-    const initialLoads = this.slots.map((slot) =>
-      this.setMedia(slot, this.choose()),
-    );
     const enablePreloading = () => {
       if (this.mountVersion !== version || this.preloadEnabled) return;
       this.preloadEnabled = true;
@@ -206,7 +242,9 @@ class HeroJourneyEl extends HTMLElement {
   }
 
   private layout() {
-    if (!this.ready) return;
+    if (!this.ready) return [];
+    this.geometry = null;
+    const loads: Promise<void>[] = [];
     const count = this.count();
     while (this.slots.length > count) {
       const slot = this.slots.pop()!;
@@ -216,19 +254,20 @@ class HeroJourneyEl extends HTMLElement {
       slot.card.remove();
     }
     while (this.slots.length < count) {
-      const slot = this.createSlot(this.slots.length);
+      const slot = this.createSlot();
       this.slots.push(slot);
       this.append(slot.card);
-      if (this.items.length && this.preloadEnabled) {
-        void this.setMedia(slot, this.choose());
+      this.planPath(slot);
+      if (this.items.length) {
+        loads.push(this.setMedia(slot, this.choose()));
         this.scheduleNext(slot);
       }
     }
-    this.slots.forEach((slot, index) => { slot.index = index; });
     this.render();
+    return loads;
   }
 
-  private createSlot(index: number): JourneySlot {
+  private createSlot(): JourneySlot {
     const card = document.createElement("div");
     card.className = "journey-card";
     card.dataset.expanded = "false";
@@ -239,8 +278,13 @@ class HeroJourneyEl extends HTMLElement {
     face.setAttribute("aria-haspopup", "dialog");
     card.append(face);
     const slot: JourneySlot = {
-      card, face, index,
-      progress: -index * 0.025,
+      card, face,
+      side: -1,
+      lane: 0,
+      bend: 0,
+      drift: 0,
+      tilt: 0,
+      progress: -1,
       duration: randomDuration(this.duration),
       generation: 0,
       media: null,
@@ -255,35 +299,53 @@ class HeroJourneyEl extends HTMLElement {
     card.addEventListener("pointerenter", (event) => {
       if (hoverQuery.matches && event.pointerType === "mouse") {
         slot.hovered = true;
+        if (this.viewerSlot) return;
         slot.dismissed = false;
         this.syncExpansion(slot);
       }
     });
     card.addEventListener("pointerleave", () => {
       slot.hovered = false;
+      if (this.viewerSlot) return;
       this.syncExpansion(slot);
     });
     card.addEventListener("focusin", () => {
       slot.focused = true;
+      if (this.viewerSlot) return;
       slot.dismissed = false;
       this.syncExpansion(slot);
     });
     card.addEventListener("focusout", (event) => {
       if (!card.contains(event.relatedTarget as Node | null)) {
         slot.focused = false;
+        if (this.viewerSlot) return;
         this.syncExpansion(slot);
       }
     });
     face.addEventListener("click", () => {
       const media = face.querySelector<HTMLImageElement | HTMLVideoElement>(".journey-media");
       const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer");
-      if (!media || !viewer || slot.card.dataset.ready !== "true") return;
-      const origin = media.getBoundingClientRect();
+      if (!media || !viewer || viewer.open || this.viewerSlot || slot.card.dataset.ready !== "true") return;
+      const origin = this.viewerOrigin(slot);
       const expanded = media.cloneNode(true) as HTMLImageElement | HTMLVideoElement;
       expanded.className = "journey-viewer-media";
       expanded.style.objectPosition = "";
+      if (expanded instanceof HTMLImageElement) expanded.decoding = "async";
+      if (expanded instanceof HTMLImageElement && slot.media?.thumbnail) {
+        const original = new Image();
+        original.onload = () => { expanded.src = original.src; };
+        original.src = slot.media.source;
+        viewer.addEventListener("close", () => { original.onload = null; }, { once: true });
+      }
       if (expanded instanceof HTMLVideoElement) expanded.controls = true;
-      viewer.querySelector(".journey-viewer-content")!.replaceChildren(expanded);
+      const content = viewer.querySelector(".journey-viewer-content")!;
+      content.replaceChildren(expanded);
+      if (slot.media?.caption?.trim()) {
+        const caption = document.createElement("figcaption");
+        caption.className = "journey-viewer-caption";
+        caption.textContent = slot.media.caption;
+        content.append(caption);
+      }
       slot.pinned = true;
       slot.dismissed = false;
       this.viewerSlot = slot;
@@ -294,39 +356,79 @@ class HeroJourneyEl extends HTMLElement {
       viewer.style.setProperty("--viewer-ratio", String(ratio));
       this.moveCursorIntoViewer(viewer);
       viewer.showModal();
+      playSound("click");
       if (!motionQuery.matches) this.viewerAnimation = this.animateViewer(origin);
       this.syncExpansion(slot);
+      this.syncActivity();
     });
     return slot;
   }
 
-  private animateViewer(origin: DOMRect, reverse = false) {
+  private viewerOrigin(slot: JourneySlot): ViewerOrigin {
+    const rect = slot.face.getBoundingClientRect();
+    const style = getComputedStyle(slot.card);
+    const matrix = new DOMMatrixReadOnly(style.transform === "none" ? undefined : style.transform);
+    const scale = Math.hypot(matrix.a, matrix.b);
+    const width = slot.face.offsetWidth * scale;
+    const height = slot.face.offsetHeight * scale;
+    return {
+      left: rect.left + (rect.width - width) / 2,
+      top: rect.top + (rect.height - height) / 2,
+      width,
+      height,
+      rotation: Math.atan2(matrix.b, matrix.a) * 180 / Math.PI,
+      opacity: Number(style.opacity),
+    };
+  }
+
+  private animateViewer(origin: ViewerOrigin, closing = false) {
     const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer")!;
-    const target = viewer.getBoundingClientRect();
+    const content = viewer.querySelector<HTMLElement>(".journey-viewer-content")!;
+    const target = viewer.querySelector<HTMLElement>(".journey-viewer-panel")!.getBoundingClientRect();
     const x = origin.left + origin.width / 2 - target.left - target.width / 2;
     const y = origin.top + origin.height / 2 - target.top - target.height / 2;
-    return viewer.animate([
-      { width: `${origin.width}px`, height: `${origin.height}px`, transform: `translate(${x}px, ${y}px)` },
-      { width: `${target.width}px`, height: `${target.height}px`, transform: "translate(0px, 0px)" },
-    ], {
-      duration: reverse ? 240 : 480,
+    // Uniform scaling plus a crop preserves the photograph's proportions.
+    const scale = Math.max(origin.width / target.width, origin.height / target.height);
+    const cropX = Math.max(0, (1 - origin.width / (target.width * scale)) * 50);
+    const cropY = Math.max(0, (1 - origin.height / (target.height * scale)) * 50);
+    const thumbnail = {
+      transform: `translate(${x}px, ${y}px) rotate(${origin.rotation}deg) scale(${scale})`,
+      clipPath: `inset(${cropY}% ${cropX}%)`,
+      opacity: origin.opacity,
+    };
+    const expanded = { transform: "translate(0px, 0px) rotate(0deg) scale(1)", clipPath: "inset(0% 0%)", opacity: 1 };
+    const current = getComputedStyle(content);
+    const start = closing && this.viewerAnimation ? {
+      transform: current.transform,
+      clipPath: current.clipPath,
+      opacity: current.opacity,
+    } : expanded;
+    this.viewerAnimation?.cancel();
+    return content.animate(closing ? [start, thumbnail] : [thumbnail, expanded], {
+      duration: closing ? 240 : 480,
       easing: getComputedStyle(this).getPropertyValue("--ease").trim(),
-      direction: reverse ? "reverse" : "normal",
+      fill: "both",
     });
   }
 
   private async closeViewer() {
     const viewer = this.querySelector<HTMLDialogElement>(".journey-viewer");
     if (!viewer?.open || this.viewerClosing) return;
+    playSound("click");
     this.viewerClosing = true;
-    const origin = this.viewerSlot?.face.getBoundingClientRect();
-    if (!motionQuery.matches && origin) {
-      if (this.viewerAnimation?.playState === "running") {
-        this.viewerAnimation.reverse();
-        this.viewerAnimation.updatePlaybackRate(-2);
-      } else {
-        this.viewerAnimation = this.animateViewer(origin, true);
-      }
+    const slot = this.viewerSlot;
+    if (slot) {
+      // Prepare the hidden card at its final size before measuring the return.
+      window.clearTimeout(slot.settleTimer);
+      slot.settleTimer = 0;
+      delete slot.card.dataset.settling;
+      slot.pinned = false;
+      slot.dismissed = true;
+      slot.card.dataset.expanded = "false";
+      this.render();
+    }
+    if (!motionQuery.matches && slot) {
+      this.viewerAnimation = this.animateViewer(this.viewerOrigin(slot), true);
       const animation = this.viewerAnimation;
       await animation.finished.catch(() => {});
       if (this.viewerAnimation !== animation) return;
@@ -363,11 +465,33 @@ class HeroJourneyEl extends HTMLElement {
     }
   }
 
-  private choose(): HeroJourneyMedia | null {
+  private choose(previous?: HeroJourneyMedia | null): HeroJourneyMedia | null {
     const available = this.items.filter((item) => !this.failed.has(item.source));
-    return available.length
-      ? available[Math.floor(Math.random() * available.length)]
+    const unused = available.filter((item) => item.source !== previous?.source &&
+      !this.slots.some((slot) => slot.media?.source === item.source));
+    const unreserved = unused.filter((item) =>
+      !this.slots.some((slot) => slot.next?.source === item.source));
+    const choices = unreserved.length ? unreserved : unused.length ? unused
+      : available.filter((item) => item.source !== previous?.source);
+    const candidates = choices.length ? choices : available;
+    return candidates.length
+      ? candidates[Math.floor(Math.random() * candidates.length)]
       : null;
+  }
+
+  private planPath(slot: JourneySlot) {
+    const routes = [-1, 1].flatMap((side) => [0, 0.5, 1].map((lane) => ({ side, lane })));
+    const busy = this.slots.filter((other) => other !== slot && other.media &&
+      (motionQuery.matches || other.progress >= 0 && other.progress < 0.55));
+    const free = routes.filter((route) => !busy.some((other) =>
+      other.side === route.side && Math.abs(other.lane - route.lane) < 0.3));
+    const choices = free.length ? free : routes;
+    const route = choices[Math.floor(Math.random() * choices.length)];
+    slot.side = route.side;
+    slot.lane = clamp(route.lane + (Math.random() - 0.5) * 0.16, 0, 1);
+    slot.bend = 0.02 + Math.random() * 0.05;
+    slot.drift = (Math.random() - 0.5) * 0.06;
+    slot.tilt = 2 + Math.random() * 4;
   }
 
   private stopVideo(slot: JourneySlot) {
@@ -383,6 +507,7 @@ class HeroJourneyEl extends HTMLElement {
     this.failed.add(source);
     this.stopVideo(slot);
     slot.media = null;
+    slot.progress = 1;
     slot.pinned = false;
     slot.dismissed = true;
     slot.card.dataset.ready = "false";
@@ -415,7 +540,7 @@ class HeroJourneyEl extends HTMLElement {
       image.alt = item.description;
       image.loading = "eager";
       image.decoding = "async";
-      image.src = item.source;
+      image.src = item.thumbnail ?? item.source;
       media = image;
     } else {
       const video = document.createElement("video");
@@ -435,12 +560,6 @@ class HeroJourneyEl extends HTMLElement {
     media.className = "journey-media";
     if (item.cropPosition) media.style.objectPosition = item.cropPosition;
     slot.face.append(media, loading);
-    if (item.caption) {
-      const caption = document.createElement("span");
-      caption.className = "journey-caption";
-      caption.textContent = item.caption;
-      slot.face.append(caption);
-    }
     return new Promise<void>((resolve) => {
       let settled = false;
       const settle = () => {
@@ -452,6 +571,7 @@ class HeroJourneyEl extends HTMLElement {
         if (slot.generation !== generation) return settle();
         slot.card.dataset.ready = "true";
         this.preparedSources.add(item.source);
+        this.render();
         settle();
       };
       const error = () => {
@@ -490,7 +610,7 @@ class HeroJourneyEl extends HTMLElement {
 
   private syncActivity() {
     if (!this.ready) return;
-    const active = this.visible && !document.hidden;
+    const active = this.visible && !document.hidden && !this.viewerSlot;
     if (!active || motionQuery.matches) {
       cancelAnimationFrame(this.frame);
       this.frame = 0;
@@ -507,9 +627,17 @@ class HeroJourneyEl extends HTMLElement {
   private tick = (time: number) => {
     const delta = this.lastFrame ? Math.min(64, time - this.lastFrame) : 0;
     this.lastFrame = time;
+    this.elapsed += delta;
     for (const slot of this.slots) {
       if (slot.card.dataset.expanded === "true" ||
           slot.card.dataset.settling === "true") continue;
+      if (slot.progress < 0) {
+        if (this.elapsed < this.nextSpawn || slot.card.dataset.ready !== "true") continue;
+        this.planPath(slot);
+        slot.progress = 0;
+        this.nextSpawn = this.elapsed + 900 + Math.random() * 1300;
+        continue;
+      }
       slot.progress += delta / slot.duration;
       if (slot.progress >= 1) this.rotate(slot);
     }
@@ -518,25 +646,30 @@ class HeroJourneyEl extends HTMLElement {
   };
 
   private rotate(slot: JourneySlot) {
-    slot.progress = 0;
+    slot.progress = -1;
     slot.duration = randomDuration(this.duration);
-    const next = slot.next && !this.failed.has(slot.next.source)
+    const next = slot.next && !this.failed.has(slot.next.source) &&
+      slot.next.source !== slot.media?.source &&
+      !this.slots.some((other) => other !== slot && other.media?.source === slot.next?.source)
       ? slot.next
-      : this.choose();
+      : this.choose(slot.media);
     slot.next = null;
     void this.setMedia(slot, next);
     this.scheduleNext(slot);
   }
 
   private render() {
-    const rect = this.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-    const portrait = this.parentElement
-      ?.querySelector<HTMLElement>(".hero-portrait")
-      ?.getBoundingClientRect();
-    const cardWidth = this.slots[0]?.card.offsetWidth ||
-      (rect.width < 640 ? 76 : rect.width < 1024 ? 110 : 130);
-    this.slots.forEach((slot) => this.renderSlot(slot, rect, portrait, cardWidth));
+    if (!this.geometry) {
+      const rect = this.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const portrait = this.parentElement?.querySelector<HTMLElement>(".hero-portrait")?.getBoundingClientRect();
+      const copy = this.parentElement?.querySelector<HTMLElement>(".hero-copy")?.getBoundingClientRect();
+      const cardWidth = this.slots[0]?.card.offsetWidth || (rect.width < 640 ? 76 : rect.width < 1024 ? 110 : 130);
+      const safeBottom = Math.min(rect.height * 0.5, copy ? copy.top - rect.top - 24 : rect.height * 0.5);
+      this.geometry = { rect, portrait, cardWidth, safeBottom };
+    }
+    const { rect, portrait, cardWidth, safeBottom } = this.geometry;
+    this.slots.forEach((slot) => this.renderSlot(slot, rect, portrait, cardWidth, safeBottom));
   }
 
   private renderSlot(
@@ -544,39 +677,36 @@ class HeroJourneyEl extends HTMLElement {
     rect: DOMRect,
     portrait: DOMRect | undefined,
     cardWidth: number,
+    safeBottom: number,
   ) {
     const phone = rect.width < 640;
     const desktop = rect.width >= 1024;
-    const side = slot.index % 2 === 0 ? -1 : 1;
-    const lane = phone
-      ? [0.14, 0.20, 0.31][slot.index] ?? 0.2
-      : desktop
-        ? [0.12, 0.15, 0.44, 0.47, 0.28, 0.31][slot.index] ?? 0.25
-        : [0.16, 0.19, 0.39, 0.42][slot.index] ?? 0.25;
+    const side = slot.side;
     const portraitCenter = portrait
       ? portrait.left - rect.left + portrait.width / 2
       : rect.width / 2;
     const portraitWidth = portrait?.width ?? rect.width * 0.35;
-    const middle = !phone && (slot.index === 2 || slot.index === 3);
-    const safeFactor = middle ? 0.44 : phone ? 0.24 : 0.23;
+    const safeFactor = phone ? 0.24 : 0.23 + slot.lane * 0.21;
     const startX = clamp(
       portraitCenter + side * (portraitWidth * safeFactor + cardWidth * 0.58),
       cardWidth * 0.55,
       rect.width - cardWidth * 0.55,
     );
     const endX = side < 0 ? -cardWidth * 0.2 : rect.width + cardWidth * 0.2;
-    const startY = rect.height * lane;
-    const endY = rect.height * (lane + (slot.index % 3 - 1) * 0.07);
+    const top = Math.max(cardWidth * 0.375 + 18, rect.height * 0.1);
+    const bottom = Math.max(top, safeBottom - cardWidth * 0.375);
+    const startY = top + slot.lane * (bottom - top);
+    const endY = clamp(startY + slot.drift * rect.height, top, bottom);
     const p = motionQuery.matches ? 0.45 : clamp(slot.progress, 0, 1);
     const controlX = startX + (endX - startX) * 0.54;
-    const controlY = (startY + endY) / 2 - rect.height * 0.045;
+    const controlY = clamp((startY + endY) / 2 - rect.height * slot.bend, top, bottom);
     const inv = 1 - p;
     const x = inv * inv * startX + 2 * inv * p * controlX + p * p * endX;
     const y = inv * inv * startY + 2 * inv * p * controlY + p * p * endY;
     const parallaxX = desktop && !motionQuery.matches ? this.pointerX * 5 : 0;
     const parallaxY = desktop && !motionQuery.matches ? this.pointerY * 4 : 0;
     const expanded = slot.card.dataset.expanded === "true";
-    const rotation = expanded || motionQuery.matches ? 0 : side * (2.5 - p * 5);
+    const rotation = expanded || motionQuery.matches ? 0 : side * slot.tilt * (1 - p * 2);
     const scale = expanded ? (phone ? 2.1 : 1.85) : 1;
     const expandedWidth = cardWidth * scale;
     const expandedHeight = expandedWidth * 0.75;
@@ -584,14 +714,14 @@ class HeroJourneyEl extends HTMLElement {
       ? clamp(x + parallaxX, expandedWidth / 2 + 18, rect.width - expandedWidth / 2 - 18)
       : x + parallaxX;
     const displayY = expanded
-      ? clamp(y + parallaxY, expandedHeight / 2 + 18, rect.height - expandedHeight / 2 - 18)
+      ? clamp(y + parallaxY, expandedHeight / 2 + 18, Math.max(expandedHeight / 2 + 18, safeBottom - expandedHeight / 2))
       : y + parallaxY;
     slot.card.style.transform =
       "translate(" + displayX + "px, " + displayY +
       "px) translate(-50%, -50%) rotate(" + rotation + "deg) scale(" + scale + ")";
     const fadeIn = clamp((p - 0.01) / 0.10, 0, 1);
     const fadeOut = clamp((1 - p) / 0.19, 0, 1);
-    const opacity = slot.media
+    const opacity = slot.media && slot.card.dataset.ready === "true"
       ? motionQuery.matches || expanded ? 1 : Math.min(fadeIn, fadeOut) * 0.9
       : 0;
     slot.card.style.opacity = String(opacity);
@@ -612,7 +742,7 @@ class HeroJourneyEl extends HTMLElement {
   }
 
   private pumpPreload() {
-    if (!this.preloadEnabled || !this.visible || document.hidden || motionQuery.matches) return;
+    if (!this.preloadEnabled || !this.visible || document.hidden || motionQuery.matches || this.viewerSlot) return;
     while (this.preloading < this.preloadConcurrency && this.preloadQueue.length) {
       const item = this.preloadQueue.shift()!;
       if (this.failed.has(item.source)) continue;
@@ -641,7 +771,7 @@ class HeroJourneyEl extends HTMLElement {
         const image = new Image();
         image.onload = finish;
         image.onerror = finish;
-        image.src = item.source;
+        image.src = item.thumbnail ?? item.source;
       } else {
         const video = document.createElement("video");
         video.preload = "auto";

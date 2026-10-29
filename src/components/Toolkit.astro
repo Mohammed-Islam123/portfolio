@@ -334,13 +334,13 @@ const pad = (n: number) => String(n).padStart(2, "0");
       cells.forEach((cell) => {
         cell.addEventListener("mouseenter", () => playSound("hover"), { signal });
         cell.addEventListener("click", () => {
+          playSound("click");
           const wrapper = cell.closest("[data-tk-cell]");
           if (!wrapper?.classList.contains("has-note")) {
             closeActive();
             return;
           }
           toggleCell(cell.dataset.cell ?? "");
-          playSound("click");
         }, { signal });
       });
 

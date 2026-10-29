@@ -35,10 +35,8 @@ const { class: className } = Astro.props;
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const reduced = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
-      const finePointer = window.matchMedia("(pointer: fine)").matches;
+      const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
 
       // Platform color management (WhatsApp emerald default)
       const parseRgb = (str: string): [number, number, number] => {
@@ -75,6 +73,8 @@ const { class: className } = Astro.props;
       let dpr = 1;
       let raf = 0;
       let running = false;
+      let visible = false;
+      let lastFrame = 0;
 
       // mouse target + smoothed position
       const mouse = { tx: -9999, ty: -9999, x: -9999, y: -9999 };
@@ -100,17 +100,21 @@ const { class: className } = Astro.props;
       const draw = (t: number) => {
         ctx.clearRect(0, 0, w, h);
         const time = t / 1000;
+        const frames = Math.min(64, Math.max(0, t - lastFrame)) / (1000 / 60);
+        lastFrame = t;
+        const colorFollow = 1 - Math.pow(0.92, frames);
+        const mouseFollow = 1 - Math.pow(0.88, frames);
 
         // Smoothly lerp current RGB towards target platform RGB
-        currentRgb[0] += (targetRgb[0] - currentRgb[0]) * 0.08;
-        currentRgb[1] += (targetRgb[1] - currentRgb[1]) * 0.08;
-        currentRgb[2] += (targetRgb[2] - currentRgb[2]) * 0.08;
+        currentRgb[0] += (targetRgb[0] - currentRgb[0]) * colorFollow;
+        currentRgb[1] += (targetRgb[1] - currentRgb[1]) * colorFollow;
+        currentRgb[2] += (targetRgb[2] - currentRgb[2]) * colorFollow;
 
         const colorStr = `${Math.round(currentRgb[0])}, ${Math.round(currentRgb[1])}, ${Math.round(currentRgb[2])}`;
 
         // smooth mouse position toward target (lerp 0.12)
-        mouse.x += (mouse.tx - mouse.x) * 0.12;
-        mouse.y += (mouse.ty - mouse.y) * 0.12;
+        mouse.x += (mouse.tx - mouse.x) * mouseFollow;
+        mouse.y += (mouse.ty - mouse.y) * mouseFollow;
         const hasMouse = mouse.tx > -9000;
 
         // soft colored bloom at cursor — matches selected platform
@@ -191,19 +195,28 @@ const { class: className } = Astro.props;
         raf = requestAnimationFrame(loop);
       };
       const start = () => {
-        if (running || reduced) return;
+        if (running || motion.matches || !visible || document.hidden) return;
         running = true;
+        lastFrame = performance.now();
         raf = requestAnimationFrame(loop);
       };
       const stop = () => {
         running = false;
         cancelAnimationFrame(raf);
+        raf = 0;
+        lastFrame = 0;
+      };
+      const syncActivity = () => {
+        if (motion.matches || !visible || document.hidden) {
+          stop();
+          if (motion.matches) drawStatic();
+        } else start();
       };
 
       const onResize = () => {
         boost = boostVal();
         build();
-        if (reduced) drawStatic();
+        if (motion.matches) drawStatic();
       };
 
       const onPlatformChange = (e: Event) => {
@@ -213,7 +226,7 @@ const { class: className } = Astro.props;
         } else if (evt.detail?.rgbStr) {
           targetRgb = parseRgb(evt.detail.rgbStr);
         }
-        if (reduced) {
+        if (motion.matches) {
           currentRgb = [...targetRgb];
           drawStatic();
         }
@@ -226,6 +239,7 @@ const { class: className } = Astro.props;
       // We listen on `window` (not the wrapper) because the wrapper has
       // pointer-events-none so it doesn't block clicks on the CTA above.
       const onMouseMove = (e: MouseEvent) => {
+        if (!visible || motion.matches || !finePointer.matches || document.hidden) return;
         const rect = this.getBoundingClientRect();
         const rx = e.clientX - rect.left;
         const ry = e.clientY - rect.top;
@@ -244,33 +258,27 @@ const { class: className } = Astro.props;
       window.addEventListener("resize", onResize);
       this.cleanupFns.push(() => window.removeEventListener("resize", onResize));
 
-      if (reduced) {
-        drawStatic();
-      } else {
-        // Start immediately if already in viewport on connect —
-        // IntersectionObserver only fires on changes.
-        const rect = this.getBoundingClientRect();
-        const vh = window.innerHeight || document.documentElement.clientHeight;
-        if (rect.top < vh && rect.bottom > 0) {
-          start();
-        }
-        const io = new IntersectionObserver(
-          ([entry]) => (entry.isIntersecting ? start() : stop()),
-          { threshold: 0 },
-        );
-        io.observe(this);
-        // only track mouse on fine-pointer devices (skip touch)
-        if (finePointer) {
-          window.addEventListener("mousemove", onMouseMove, { passive: true });
-        }
-        this.cleanupFns.push(() => {
-          stop();
-          io.disconnect();
-          if (finePointer) {
-            window.removeEventListener("mousemove", onMouseMove);
-          }
-        });
-      }
+      syncActivity();
+      const onLeave = () => { mouse.tx = -9999; mouse.ty = -9999; };
+      const io = new IntersectionObserver(([entry]) => {
+        visible = Boolean(entry?.isIntersecting);
+        if (!visible) onLeave();
+        syncActivity();
+      }, { threshold: 0 });
+      io.observe(this);
+      const onPreference = () => { onLeave(); syncActivity(); };
+      window.addEventListener("mousemove", onMouseMove, { passive: true });
+      document.addEventListener("visibilitychange", syncActivity);
+      motion.addEventListener("change", onPreference);
+      finePointer.addEventListener("change", onPreference);
+      this.cleanupFns.push(() => {
+        stop();
+        io.disconnect();
+        window.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("visibilitychange", syncActivity);
+        motion.removeEventListener("change", onPreference);
+        finePointer.removeEventListener("change", onPreference);
+      });
     }
 
     disconnectedCallback() {

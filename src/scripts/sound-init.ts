@@ -1,34 +1,17 @@
-/**
- * sound-init — global sound state + arming. ON BY DEFAULT (user request).
- *
- * Consolidates the old useSound() React hook into a single vanilla
- * controller imported once from the Layout:
- *
- *  • reads capability + stored preference, enables the SoundEngine
- *  • arms the AudioContext on the first pointer/keydown (autoplay policy)
- *  • `toggleSound()` and `setSoundVolume()` persist the visitor's settings
- *    and broadcast `mi-sound-change` so nav and footer controls stay in sync
- *
- * Components play sounds through `playSound()` — a thin wrapper that is
- * a no-op when sound is off (the engine no-ops internally anyway, but
- * the wrapper also skips when the browser is not sound-capable, matching
- * the old hook's `capable` gate).
- *
- * Astro lifecycle: INIT ONCE. Module state survives SPA navigations;
- * SoundToggle UIs re-read state in their connectedCallback.
- */
+/** Shared sound preference survives Astro navigation; audio starts on a gesture. */
 
 import { sound, isSoundCapable } from "../lib/sound";
+import { defaultSoundVolume } from "../config/sound";
 
 const STORAGE_KEY = "mi-sound";
 const VOLUME_STORAGE_KEY = "mi-sound-volume";
-const DEFAULT_VOLUME = 75;
 // Dispatched for mute and volume changes so every control stays in sync.
 export const SOUND_SYNC_EVENT = "mi-sound-change";
 
 let enabled = false;
-let volume = DEFAULT_VOLUME;
+let volume = defaultSoundVolume;
 let initialized = false;
+let armed = false;
 
 function readState() {
   const can = isSoundCapable();
@@ -47,24 +30,20 @@ function readState() {
   }
   sound.setVolume(volume / 100);
   enabled = want && volume > 0;
-  if (enabled) {
-    // arm: sound.enable() creates/resumes the context; the resume only
-    // takes effect once a gesture fires — the listeners below cover that.
-    sound.enable();
-  }
 }
 
 if (typeof window !== "undefined" && !initialized) {
   initialized = true;
   readState();
 
-  // resume the AudioContext on the first user gesture (autoplay policy).
-  // sound.enable() is a no-op if already running.
+  // Construct/resume audio only from a user gesture, including after interruption.
   const arm = () => {
+    armed = true;
     if (enabled) sound.enable();
   };
-  window.addEventListener("pointerdown", arm, { passive: true });
-  window.addEventListener("keydown", arm, { passive: true });
+  window.addEventListener("pointerdown", arm, { passive: true, capture: true });
+  window.addEventListener("keydown", arm, { passive: true, capture: true });
+  window.addEventListener("click", arm, { passive: true, capture: true });
 
   // keep in sync if another controller instance broadcasts a change
   window.addEventListener(SOUND_SYNC_EVENT, (e) => {
@@ -92,13 +71,14 @@ function broadcast() {
 export function toggleSound(): void {
   if (!isSoundCapable()) return;
   if (!enabled && volume === 0) {
-    volume = DEFAULT_VOLUME;
+    volume = defaultSoundVolume;
     sound.setVolume(volume / 100);
     try { localStorage.setItem(VOLUME_STORAGE_KEY, String(volume)); } catch { /* ignore */ }
   }
   enabled = !enabled;
 
   if (enabled) {
+    armed = true;
     sound.enable(); // called from a click — satisfies autoplay policy
     sound.play("toggle");
   } else {
@@ -119,8 +99,10 @@ export function setSoundVolume(value: number): void {
   volume = Math.min(100, Math.max(0, Math.round(value)));
   sound.setVolume(volume / 100);
   enabled = volume > 0;
-  if (enabled) sound.enable();
-  else sound.disable();
+  if (enabled) {
+    armed = true;
+    sound.enable();
+  } else sound.disable();
   try {
     localStorage.setItem(VOLUME_STORAGE_KEY, String(volume));
     localStorage.setItem(STORAGE_KEY, enabled ? "on" : "off");
@@ -129,6 +111,6 @@ export function setSoundVolume(value: number): void {
 }
 
 export function playSound(name: Parameters<typeof sound.play>[0]): void {
-  if (enabled) sound.enable();
+  if (!enabled || !armed) return;
   sound.play(name);
 }
