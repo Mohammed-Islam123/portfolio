@@ -63,5 +63,6 @@ test("the hosting configuration runs the handler before only explicit error asse
   const config = JSON.parse(await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
   assert.equal(config.main, "src/worker.js");
   assert.equal(config.assets.binding, "ASSETS");
+  assert.equal(config.assets.not_found_handling, "404-page");
   assert.deepEqual(config.assets.run_worker_first, ["/404", "/404/", "/404.html", "/fr/404", "/fr/404/", "/fr/404/index.html"]);
 });
