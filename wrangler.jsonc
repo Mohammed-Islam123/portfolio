@@ -1,7 +1,10 @@
 {
   "name": "portfolio",
+  "main": "src/worker.js",
   "compatibility_date": "2026-10-11",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/404", "/404/", "/404.html", "/fr/404", "/fr/404/", "/fr/404/index.html"]
   }
 }

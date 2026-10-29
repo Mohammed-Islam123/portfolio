@@ -12,6 +12,7 @@ export type Technology = {
   label: string;
   icon: SimpleIcon | { src: string; lightSrc?: string; source: string } | null;
   monochrome?: boolean;
+  /** Optional toolkit caption; omit it to hide the note and its indicator. */
   description?: string;
 };
 
@@ -28,17 +29,14 @@ export const technologies = {
   aspnetcore: {
     label: "ASP.NET Core",
     icon: { src: "/icons/tech/dotnet.svg", source: "https://github.com/dotnet/brand/blob/main/logo/dotnet-logo.svg" },
-    description: "Used for APIs in Maqraa, Dirassati, FitTech, NoteCapture, Reactivities, and BookingDz.",
   },
   efcore: {
     label: "EF Core",
     icon: { src: "/icons/tech/efcore.svg", source: "https://github.com/dotnet/efcore/blob/main/logo/ef-logo.svg" },
-    description: "Used for persistence in NoteCapture, Reactivities, and BookingDz.",
   },
   adonet: { label: "ADO.NET", icon: null },
   postgresql: {
     label: "PostgreSQL", icon: siPostgresql,
-    description: "Used in FitTech, NoteCapture, and BookingDz.",
   },
   sqlserver: {
     label: "SQL Server",
@@ -48,11 +46,9 @@ export const technologies = {
   mongodb: { label: "MongoDB", icon: siMongodb },
   redis: {
     label: "Redis", icon: siRedis,
-    description: "Used for caching in FitTech.",
   },
   signalr: {
     label: "SignalR", icon: null,
-    description: "Used for real-time parent notifications in Dirassati and WebRTC signaling in SAHM.",
   },
   grpc: {
     label: "gRPC",
@@ -61,15 +57,12 @@ export const technologies = {
       lightSrc: "/icons/tech/grpc.svg",
       source: "https://github.com/cncf/artwork/tree/main/projects/grpc",
     },
-    description: "Used for communication between FitTech services.",
   },
   webrtc: {
     label: "WebRTC", icon: siWebrtc, monochrome: true,
-    description: "Used for camera streaming and control commands between SAHM's robot and dashboard.",
   },
   rabbitmq: {
     label: "RabbitMQ", icon: siRabbitmq,
-    description: "Used for payment confirmation events between FitTech services.",
   },
   jwt: { label: "JWT", icon: siJsonwebtokens, monochrome: true },
   protobuf: { label: "Protocol Buffers", icon: null },
@@ -83,7 +76,6 @@ export const technologies = {
   tailwindcss: { label: "Tailwind CSS", icon: siTailwindcss },
   reactnative: {
     label: "React Native", icon: siReact,
-    description: "Used for the StoryFox mobile frontend and its Gemini integration.",
   },
   expo: { label: "Expo", icon: siExpo, monochrome: true },
   flutter: { label: "Flutter", icon: siFlutter },
@@ -93,14 +85,12 @@ export const technologies = {
   aspire: {
     label: "Aspire",
     icon: { src: "/icons/tech/aspire.svg", source: "https://microsoft.github.io/aspire-brand/" },
-    description: "Used to configure service discovery and startup dependencies for FitTech's services and infrastructure.",
   },
   nginx: { label: "Nginx", icon: siNginx },
   ros2: { label: "ROS 2", icon: siRos, monochrome: true },
   nav2: {
     label: "Nav2",
     icon: { src: "/icons/tech/nav2.png", source: "https://docs.nav2.org/rolling/" },
-    description: "Used with ROS 2 for SAHM's autonomous navigation.",
   },
   raspberrypi: { label: "Raspberry Pi", icon: siRaspberrypi },
   jetson: { label: "Jetson AGX Xavier", icon: siNvidia },
@@ -108,20 +98,17 @@ export const technologies = {
   cplusplus: { label: "C++", icon: siCplusplus },
   esp32: {
     label: "ESP32", icon: siEspressif,
-    description: "Used in Zmala's monitoring bracelet and the Afrobot fighting robot's firmware.",
   },
   esp8266: { label: "ESP8266", icon: siEspressif },
   arduino: { label: "Arduino", icon: siArduino },
   platformio: { label: "PlatformIO", icon: siPlatformio },
   mqtt: {
     label: "MQTT", icon: siMqtt, monochrome: true,
-    description: "Used for telemetry and event reporting in Zmala's monitoring system.",
   },
   uart: { label: "UART", icon: null },
   sbus: { label: "SBUS", icon: null },
   gemini: {
     label: "Gemini API", icon: siGooglegemini,
-    description: "Used for handwritten exam extraction in NoteCapture and illustrated story generation in StoryFox.",
   },
   claudecode: { label: "Claude Code", icon: siClaude },
   codex: {

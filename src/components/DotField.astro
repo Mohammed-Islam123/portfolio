@@ -40,9 +40,8 @@
       const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) return;
 
-      const reduced = window.matchMedia(
-        "(prefers-reduced-motion: reduce)",
-      ).matches;
+      const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
 
       // read the field color + alpha boost from CSS so the canvas adapts to
       // the active theme (white on dark, dark on light) and stays equally
@@ -70,11 +69,12 @@
       let dpr = 1;
       let raf = 0;
       let running = false;
+      let visible = false;
       const mouse = { x: -9999, y: -9999, active: false };
       const GAP = 34; // px between dots (CSS px)
       const BASE_R = 0.9;
 
-      const dots: { x: number; y: number; phase: number }[] = [];
+      const dots: { x: number; y: number; phase: number; vignette: number }[] = [];
 
       const build = () => {
         dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -92,28 +92,23 @@
         const rows = Math.ceil(h / GAP) + 1;
         const offsetX = (w - (cols - 1) * GAP) / 2;
         const offsetY = (h - (rows - 1) * GAP) / 2;
+        const maxD = Math.max(1, Math.hypot(w, h) * 0.5);
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
+            const x = offsetX + c * GAP;
+            const y = offsetY + r * GAP;
             dots.push({
-              x: offsetX + c * GAP,
-              y: offsetY + r * GAP,
+              x, y,
               phase: Math.random() * Math.PI * 2,
+              vignette: Math.max(0, 1 - Math.hypot(x - w / 2, y - h * 0.42) / maxD * 1.15),
             });
           }
         }
       };
 
-      // center for vignette computation
-      let cx = 0;
-      let cy = 0;
-      let maxD = 1;
-
       const draw = (t: number) => {
         ctx.clearRect(0, 0, w, h);
         const time = t / 1000;
-        cx = w / 2;
-        cy = h * 0.42;
-        maxD = Math.hypot(w, h) * 0.5;
 
         for (let i = 0; i < dots.length; i++) {
           const d = dots[i];
@@ -121,9 +116,7 @@
           let r = BASE_R + pulse * 0.5;
 
           // distance-from-center vignette: brighter near center, fades to edges
-          const dd = Math.hypot(d.x - cx, d.y - cy) / maxD;
-          const vignette = Math.max(0, 1 - dd * 1.15);
-          let alpha = (0.08 + pulse * 0.12) * (0.35 + vignette * 0.65) * boost;
+          let alpha = (0.08 + pulse * 0.12) * (0.35 + d.vignette * 0.65) * boost;
 
           // mouse proximity bloom
           if (mouse.active) {
@@ -147,14 +140,9 @@
 
       const drawStatic = () => {
         ctx.clearRect(0, 0, w, h);
-        cx = w / 2;
-        cy = h * 0.42;
-        maxD = Math.hypot(w, h) * 0.5;
         for (let i = 0; i < dots.length; i++) {
           const d = dots[i];
-          const dd = Math.hypot(d.x - cx, d.y - cy) / maxD;
-          const vignette = Math.max(0, 1 - dd * 1.15);
-          const alpha = 0.22 * (0.35 + vignette * 0.65) * boost;
+          const alpha = 0.22 * (0.35 + d.vignette * 0.65) * boost;
           ctx.beginPath();
           ctx.arc(d.x, d.y, BASE_R + 0.4, 0, Math.PI * 2);
           ctx.fillStyle = `rgba(${color}, ${alpha})`;
@@ -168,23 +156,31 @@
       };
 
       const start = () => {
-        if (running || reduced) return;
+        if (running || motion.matches || !visible || document.hidden) return;
         running = true;
         raf = requestAnimationFrame(loop);
       };
       const stop = () => {
         running = false;
         cancelAnimationFrame(raf);
+        raf = 0;
+      };
+      const syncActivity = () => {
+        if (motion.matches || !visible || document.hidden) {
+          stop();
+          if (motion.matches) drawStatic();
+        } else start();
       };
 
       const onResize = () => {
         color = fieldColor(); // re-read in case the theme flipped
         boost = fieldBoost();
         build();
-        if (reduced) drawStatic();
+        if (motion.matches) drawStatic();
       };
 
       const onMove = (e: MouseEvent) => {
+        if (!visible || motion.matches || !finePointer.matches || document.hidden) return;
         const rect = this.getBoundingClientRect();
         mouse.x = e.clientX - rect.left;
         mouse.y = e.clientY - rect.top;
@@ -197,28 +193,30 @@
       };
 
       build();
-      if (reduced) {
-        drawStatic();
-      } else {
-        // visibility-gated run
-        const io = new IntersectionObserver(
-          ([entry]) => (entry.isIntersecting ? start() : stop()),
-          { threshold: 0 },
-        );
-        io.observe(this);
-
-        window.addEventListener("resize", onResize);
-        window.addEventListener("mousemove", onMove, { passive: true });
-        this.addEventListener("mouseleave", onLeave);
-
-        this.cleanupFns.push(() => {
-          stop();
-          io.disconnect();
-          window.removeEventListener("resize", onResize);
-          window.removeEventListener("mousemove", onMove);
-          this.removeEventListener("mouseleave", onLeave);
-        });
-      }
+      syncActivity();
+      const io = new IntersectionObserver(([entry]) => {
+        visible = Boolean(entry?.isIntersecting);
+        if (!visible) onLeave();
+        syncActivity();
+      }, { threshold: 0 });
+      io.observe(this);
+      const onPreference = () => { onLeave(); syncActivity(); };
+      window.addEventListener("resize", onResize);
+      window.addEventListener("mousemove", onMove, { passive: true });
+      this.addEventListener("mouseleave", onLeave);
+      document.addEventListener("visibilitychange", syncActivity);
+      motion.addEventListener("change", onPreference);
+      finePointer.addEventListener("change", onPreference);
+      this.cleanupFns.push(() => {
+        stop();
+        io.disconnect();
+        window.removeEventListener("resize", onResize);
+        window.removeEventListener("mousemove", onMove);
+        this.removeEventListener("mouseleave", onLeave);
+        document.removeEventListener("visibilitychange", syncActivity);
+        motion.removeEventListener("change", onPreference);
+        finePointer.removeEventListener("change", onPreference);
+      });
     }
 
     disconnectedCallback() {

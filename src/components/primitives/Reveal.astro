@@ -1,8 +1,7 @@
 ---
 /**
- * Reveal — wraps children, adds reveal-init for the scroll-reveal
- * observer (scripts/reveal.ts). Content is visible-by-default in CSS;
- * JS only enhances the entrance (fail-safe per design system §8).
+ * Visible static content; the scroll observer opts offscreen elements
+ * into an entrance animation after it has initialized.
  */
 interface Props {
   class?: string;
@@ -13,7 +12,7 @@ const { class: className, delay } = Astro.props;
 ---
 
 <div
-  class={`reveal reveal-init ${className ?? ""}`}
+  class={`reveal ${className ?? ""}`}
   style={delay ? `transition-delay: ${delay}ms;` : undefined}
 >
   <slot />

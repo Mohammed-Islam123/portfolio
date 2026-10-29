@@ -1,35 +1,7 @@
 ---
 import { localeFromPath } from "../lib/i18n";
 import { useTranslations } from "../config/i18n";
-/**
- * Hero — centered portrait with a bottom fade mask, a dot field behind,
- * and the greeting text rising out of the portrait's faded bottom.
- *
- *  Line 1 : 👋 hello   (waving hand instead of "//")
- *  Line 2 : "I am Mohamed Islam Benyahkem."  — "I am" light/dim, name
- *           scrambles in via <scramble-name>
- *  Line 3 : role keywords (static)
- *  Line 4 : [download cv] [contact] buttons
- *
- *  ── Reveal coordination ────────────────────────────────────────────
- *  All entrance animations (hero-fade) are GATED on the loader:dismiss
- *  event (with a 2.5s safety timeout). Without this gate, the fades
- *  would play while the loader is hiding the hero — by the time the
- *  loader lifts, the fades would be done and the hero would just
- *  "appear" with no motion.
- *
- *  With the gate: loader lifts → hero fades in → name scrambles in.
- *  The "I am" kicker leads the scramble (0ms delay, 200ms duration),
- *  scramble starts 150ms after loader:dismiss (see ScrambleName).
- *
- *  ── Live clock (top-left) + "open to work" pill (top-right) ────────
- *  Both live INSIDE the hero and the hero carries
- *  `transform: translateZ(0)`. That transform establishes a containing
- *  block for `position: fixed`, so the clock AND the status pill behave
- *  exactly like gorix.zip's chrome: they stay pinned to the viewport
- *  while the hero is in view, then scroll away with the hero once you
- *  pass it (instead of lingering forever like true fixed elements).
- */
+
 import { getSiteConfig } from "../config/site";
 import DotField from "./DotField.astro";
 import Greeting from "./Greeting.astro";
@@ -48,15 +20,10 @@ const siteConfig = getSiteConfig(locale);
   data-timezone={siteConfig.timezone}
   style="transform: translateZ(0); display: flex;"
 >
-  <!-- shader background -->
+
   <DotField />
   <HeroJourney />
 
-  <!-- ── live clock (top-left, scrolls with hero, lg+) ────────────
-       VISIBLE FROM FRAME 1 — not gated on the loader. The clock is
-       "system info" and feels right that it's there from the start,
-       even while the terminal loader is typing `whoami`. It fades in
-       on load with a short independent animation. -->
   <div
     aria-hidden="true"
     class="nav-haze pointer-events-none fixed left-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2 rounded-full border border-[var(--glass-border)] px-3.5 font-mono text-xs text-[var(--ink-dim)] lg:flex"
@@ -68,12 +35,6 @@ const siteConfig = getSiteConfig(locale);
     </span>
   </div>
 
-  <!-- ── "open to work" status pill (top-right, scrolls with hero) ─
-       HIDDEN during loading — gated on loader:dismiss. The clock is
-       system info (stays), but the status pill is portfolio chrome and
-       should only appear when the hero does. Mirrors the clock on the
-       left: same top offset + height so it sits on the nav links'
-       horizontal line. lg+ only (matches the clock). -->
   <div
     aria-hidden="true"
     class="hero-gated pointer-events-none fixed right-4 top-3 z-50 hidden h-[38px] select-none items-center gap-2.5 rounded-full border border-[var(--glass-border)] bg-[var(--glass-bg)] px-3.5 font-mono text-xs text-[var(--ink-muted)] backdrop-blur-md lg:flex hf-500-200"
@@ -94,13 +55,9 @@ const siteConfig = getSiteConfig(locale);
     <span class="text-[var(--ink)]">{siteConfig.status.label}</span>
   </div>
 
-  <!-- ── portrait + copy ─────────────────────────────────────────
-       The portrait is deliberately an unframed page element, rather than
-       a card. Its lower mask dissolves through the copy so the two layers
-       feel like one hero composition. -->
   <div class="relative z-10 grid w-full min-h-[calc(100svh-var(--nav-h))] place-items-center">
     <div class="hero-gated group relative [grid-area:1/1] hf-800-0">
-      <!-- soft monochrome glow behind the unframed portrait -->
+
       <div
         aria-hidden="true"
         class="pointer-events-none absolute left-1/2 top-[38%] h-[84%] w-[148%] -translate-x-1/2 -translate-y-1/2"
@@ -108,8 +65,6 @@ const siteConfig = getSiteConfig(locale);
       >
       </div>
 
-      <!-- The image is intentionally large and borderless. The bottom
-           mask begins behind the text and dissolves into the page colour. -->
       <img
         src="/portrait-hero.webp"
         width="720"
@@ -119,11 +74,8 @@ const siteConfig = getSiteConfig(locale);
         class="hero-portrait relative block h-[clamp(42rem,104svh,70rem)] w-auto max-w-[94vw] -translate-y-[clamp(0.75rem,3vh,2.5rem)] object-contain bw-img" />
     </div>
 
-    <!-- The copy overlays the portrait's lower fade instead of sitting
-         below it. "I am" remains aligned to the name's left edge. -->
     <div class="hero-copy relative isolate z-10 flex [grid-area:1/1] self-end flex-col items-center px-6 pb-[clamp(5.5rem,11vh,8rem)] text-center">
-      <!-- A local wash improves text contrast without becoming a visible
-           panel or dimming the portrait's face. -->
+
       <div aria-hidden="true" class="hero-copy__wash pointer-events-none absolute -inset-x-12 -bottom-8 -top-20 -z-10"></div>
       <p
         class="hero-gated font-mono text-[clamp(1.6rem,4.4vw,2.4rem)] tracking-[0.16em] text-[var(--ink)] uppercase hf-700-100"
@@ -133,39 +85,25 @@ const siteConfig = getSiteConfig(locale);
       <h1
         class="mt-3 flex flex-col items-start font-sans font-semibold leading-[1.0] tracking-[-0.04em] text-[var(--ink)] text-[clamp(1.35rem,5.6vw,1.9rem)] md:text-[clamp(2rem,7vw,4.75rem)]"
       >
-        <!-- "I am" kicker — leads the name scramble. 0ms delay so it
-             starts the instant the loader begins lifting; 200ms
-             duration so it's visible before the scramble gets going
-             (scramble starts 150ms after loader:dismiss, runs ~840ms).
-             The reader sees "I am ____" then the name resolves into
-             place — the loader was the question, the name is the
-             answer. -->
+
         <span
           class="hero-gated font-light hf-200-0"
           style="color: var(--ink-soft); font-size: 0.4em; letter-spacing: 0.06em; margin-bottom: 0.25em;"
         >
           {t("I am")}
         </span>
-        <!-- name — driven by <scramble-name>, which listens for
-             loader:dismiss and starts the scramble 150ms later.
-             No hero-fade on the name; the scramble IS the entrance.
-             The trailing period stays static (ink-soft). -->
+
         <span class="text-[var(--ink)]">
           <ScrambleName /><span class="text-[var(--ink-soft)]">.</span>
         </span>
       </h1>
-      <!-- role keywords — static line -->
+
       <p
         class="hero-gated mt-5 max-w-[42rem] font-mono text-[clamp(0.8rem,1.6vw,0.95rem)] tracking-[0.08em] text-[var(--ink-soft)] hf-800-400"
       >
         {siteConfig.roleKeywords}
       </p>
 
-      <!-- ── action buttons — download cv + contact ─────────────
-          Two buttons, centered. The bottom margin pushes the whole
-          centered column up (the section is justify-center) so there's
-          a comfortable gap between the buttons and the absolute scroll
-          cue at the bottom. -->
       <div class="hero-gated mt-8 mb-16 flex flex-wrap items-center justify-center gap-3.5 hf-800-600">
         <CvDropdown locale={locale} />
         <a
@@ -175,7 +113,7 @@ const siteConfig = getSiteConfig(locale);
           data-sound-click
         >
           <span>{t("contact")}</span>
-          <!-- arrow-down icon (lucide "arrow-down", 16x16) -->
+
           <svg
             width="16"
             height="16"
@@ -196,7 +134,6 @@ const siteConfig = getSiteConfig(locale);
     </div>
   </div>
 
-  <!-- scroll cue -->
   <div
     class="hero-gated absolute bottom-10 left-1/2 -translate-x-1/2 font-mono text-xs tracking-[0.32em] text-[var(--ink-dim)] uppercase hf-800-800"
   >
@@ -218,9 +155,6 @@ const siteConfig = getSiteConfig(locale);
 <script>
   import { playSound } from "../scripts/sound-init";
 
-  /** live clock (HH:MM:SS in the site timezone), paused when the tab
-   *  is hidden. Placeholder "--:--:--" in static HTML; first tick on
-   *  the next animation frame after connect. */
   function formatTime(timezone: string): string {
     if (typeof Intl === "undefined") {
       const d = new Date();
@@ -249,22 +183,37 @@ const siteConfig = getSiteConfig(locale);
     private cleanupFns: (() => void)[] = [];
 
     connectedCallback() {
-      // The state check covers a loader that dismissed before this
-      // component connected during a document or ClientRouter lifecycle.
-      const reveal = () => this.classList.add("revealed");
-      const loaderDismissed = document.documentElement.dataset.loaderState === "dismissed";
-      if (loaderDismissed) {
+
+      const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const reveal = () => {
+        this.classList.remove("is-loading");
+        this.classList.add("revealed");
+      };
+      const stage = () => {
+        if (motion.matches || document.documentElement.dataset.clientNavigation === "true") {
+          this.classList.add("is-client-navigation");
+          reveal();
+          return;
+        }
+        this.classList.remove("revealed", "is-client-navigation");
+        this.classList.add("is-loading", "is-enhanced");
+      };
+      const onState = (event: Event) => {
+        if ((event as CustomEvent<{ state: string }>).detail.state === "loading") stage();
+        else reveal();
+      };
+      if (document.documentElement.dataset.loaderState === "loading") stage();
+      else {
         this.classList.add("is-client-navigation");
+        reveal();
       }
-      if (loaderDismissed) reveal();
-      else window.addEventListener("loader:dismiss", reveal, { once: true });
-      const safety = setTimeout(reveal, 6000);
+      window.addEventListener("loader:statechange", onState);
+      window.addEventListener("loader:dismiss", reveal);
       this.cleanupFns.push(() => {
         window.removeEventListener("loader:dismiss", reveal);
-        clearTimeout(safety);
+        window.removeEventListener("loader:statechange", onState);
       });
 
-      // Sound feedback for hero interactive elements
       this.querySelectorAll<HTMLElement>("[data-sound-hover]").forEach((el) => {
         const onHover = () => playSound("hover");
         el.addEventListener("mouseenter", onHover);
@@ -276,7 +225,6 @@ const siteConfig = getSiteConfig(locale);
         this.cleanupFns.push(() => el.removeEventListener("click", onClick));
       });
 
-      // ── live clock ───────────────────────────────────────────────
       const clock = this.querySelector<HTMLElement>(".hero-clock");
       if (clock) {
         const tz = this.dataset.timezone ?? "Africa/Algiers";
@@ -313,9 +261,7 @@ const siteConfig = getSiteConfig(locale);
 </script>
 
 <style>
-  /* The portrait keeps its natural cut-out silhouette. This mask only
-     softens its lower edge, letting the overlaid copy emerge from the
-     image and then resolve into the page background. */
+
   .hero-portrait {
     -webkit-mask-image: linear-gradient(to bottom, #000 42%, #000 50%, transparent 94%);
     mask-image: linear-gradient(to bottom, #000 42%, #000 50%, transparent 94%);
@@ -333,7 +279,6 @@ const siteConfig = getSiteConfig(locale);
     );
   }
 
-  /* Hero CTA Contact button styling with theme-aware elevation */
   .hero-cta-contact {
     background: var(--ink);
     color: var(--bg);
@@ -387,33 +332,31 @@ const siteConfig = getSiteConfig(locale);
     }
   }
 
-  /* gated elements: hidden until the hero is revealed; each class
-     carries its original duration/delay from the React fade() helper */
-  .hero-gated {
+  .hero-root.is-loading .hero-gated {
     opacity: 0;
   }
-  .hero-root.revealed .hf-200-0 {
+  .hero-root.is-enhanced.revealed .hf-200-0 {
     animation: hero-fade 200ms var(--ease) 0ms both;
   }
-  .hero-root.revealed .hf-500-200 {
+  .hero-root.is-enhanced.revealed .hf-500-200 {
     animation: hero-fade 500ms var(--ease) 200ms both;
   }
-  .hero-root.revealed .hf-700-100 {
+  .hero-root.is-enhanced.revealed .hf-700-100 {
     animation: hero-fade 700ms var(--ease) 100ms both;
   }
-  .hero-root.revealed .hf-800-0 {
+  .hero-root.is-enhanced.revealed .hf-800-0 {
     animation: hero-fade 800ms var(--ease) 0ms both;
   }
-  .hero-root.revealed .hf-800-400 {
+  .hero-root.is-enhanced.revealed .hf-800-400 {
     animation: hero-fade 800ms var(--ease) 400ms both;
   }
-  .hero-root.revealed .hf-800-600 {
+  .hero-root.is-enhanced.revealed .hf-800-600 {
     animation: hero-fade 800ms var(--ease) 600ms both;
   }
-  .hero-root.revealed .hf-800-800 {
+  .hero-root.is-enhanced.revealed .hf-800-800 {
     animation: hero-fade 800ms var(--ease) 800ms both;
   }
-  .hero-root.is-client-navigation .hero-gated {
+  .hero-root.is-client-navigation.revealed .hero-gated {
     opacity: 1;
     transform: none;
     animation: none;

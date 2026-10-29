@@ -880,7 +880,7 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
 
 /* ──────────────────────────────────────────────────────────────────────
  *  REVEAL ON SCROLL — visible by default (JS-free fail-safe)
- *  JS adds .is-visible; if JS fails, content is still shown.
+ *  JS arms only offscreen elements after its observer is ready.
  * ────────────────────────────────────────────────────────────────────── */
 .reveal {
   opacity: 1;
@@ -906,7 +906,7 @@ html.route-transitioning::view-transition-new(root) { animation: route-clip-in 7
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  .reveal { opacity: 1 !important; transform: none !important; }
+  .reveal, .hero-gated { opacity: 1 !important; transform: none !important; }
 }
 
 /* ──────────────────────────────────────────────────────────────────────
@@ -1181,8 +1181,8 @@ html.light .theme-icon-moon {
 .article-code-copy[data-state="failed"] { border-color: var(--warn); color: var(--warn); }
 .article-back-to-top {
   position: fixed;
-  right: clamp(0.85rem, 3vw, 2rem);
-  bottom: 1.25rem;
+  inset-inline-end: clamp(0.85rem, 3vw, 2rem);
+  inset-block-end: 1.25rem;
   z-index: 50;
   display: grid;
   width: 2.75rem;

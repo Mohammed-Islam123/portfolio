@@ -84,8 +84,8 @@ export const french = {
   "Used for the StoryFox mobile frontend and its Gemini integration.": "Utilisé pour l'interface mobile de StoryFox et son intégration avec Gemini.",
   "Used to configure service discovery and startup dependencies for FitTech's services and infrastructure.": "Utilisé pour configurer la découverte des services et leurs dépendances de démarrage dans FitTech.",
   "Used with ROS 2 for SAHM's autonomous navigation.": "Utilisé avec ROS 2 pour la navigation autonome de SAHM.",
-  "Used in Zmala's monitoring bracelet and the Afrobot fighting robot's firmware.": "Utilisé dans le bracelet de suivi Zmala et le firmware du robot de combat Afrobot.",
-  "Used for telemetry and event reporting in Zmala's monitoring system.": "Utilisé pour la télémétrie et la remontée d'événements du système de suivi Zmala.",
+  "Used in the house arrest bracelet and the Afrobot fighting robot's firmware.": "Utilisé dans le bracelet d'assignation à résidence et le firmware du robot de combat Afrobot.",
+  "Used for telemetry and event reporting in the house arrest bracelet's monitoring system.": "Utilisé pour la télémétrie et la remontée d'événements du système de suivi du bracelet d'assignation à résidence.",
   "Used for handwritten exam extraction in NoteCapture and illustrated story generation in StoryFox.": "Utilisé pour extraire les données des copies manuscrites dans NoteCapture et générer les histoires illustrées de StoryFox.",
 } satisfies Record<string, string>;
 

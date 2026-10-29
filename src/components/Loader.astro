@@ -24,7 +24,7 @@ const t = useTranslations(locale);
 ---
 
 <noscript><style>.loader-overlay{display:none}</style></noscript>
-<boot-loader data-mode={mode} data-command={command?.text} data-type-duration={typeDuration}>
+<boot-loader data-mode={mode} style={command ? `--command-length:${Array.from(command.text).length};--command-width:${Array.from(command.text).length}ch;--type-duration:${typeDuration}ms` : undefined}>
   <div
     class="loader-overlay"
     role="dialog"
@@ -33,13 +33,12 @@ const t = useTranslations(locale);
   >
     <div class="loader-terminal">
       {command && (
-        <div class="loader-command-line">
+        <div class="loader-command-line" dir="ltr">
           <span class="loader-prompt">{command.prompt}</span>
-          <span>&nbsp;</span>
           <span class="loader-command">
-            {command.text}
+            <span class="loader-command-text">{command.text}</span>
+            <span class="loader-cursor" aria-hidden="true"></span>
           </span>
-          <span class="loader-cursor" aria-hidden="true"></span>
         </div>
       )}
       <p class="loader-status">
@@ -50,29 +49,40 @@ const t = useTranslations(locale);
   </div>
 </boot-loader>
 
+<script is:inline>
+  (() => {
+    const loader = document.currentScript?.previousElementSibling;
+    if (loader?.localName !== "boot-loader" || loader.hasAttribute("data-active")) return;
+    document.documentElement.dataset.loaderState = "loading";
+    // Release the static overlay if the component module never starts.
+    window.setTimeout(() => {
+      if (!loader.isConnected || loader.hasAttribute("data-active")) return;
+      loader.remove();
+      document.documentElement.dataset.loaderState = "dismissed";
+      document.documentElement.classList.remove("loader-scroll-lock");
+      window.dispatchEvent(new CustomEvent("loader:dismiss"));
+      window.dispatchEvent(new CustomEvent("loader:statechange", { detail: { state: "dismissed" } }));
+    }, 8000);
+  })();
+</script>
+
 <script>
   let activeLoader: BootLoader | undefined;
 
   class BootLoader extends HTMLElement {
-    private timers: number[] = [];
-    private onLoad?: () => void;
-    private onPageLoad?: () => void;
-    private animationFrame?: number;
+    private lifecycle = new AbortController();
+    private removeTimer?: number;
+    private holdTimer?: number;
     private ready = false;
-    private typed = false;
+    private commandReady = false;
     private dismissed = false;
 
-    private later(delay: number, action: () => void) {
-      const timer = window.setTimeout(action, delay);
-      this.timers.push(timer);
-    }
-
     connectedCallback() {
-      // A fresh loader is mounted after every Astro client-side swap. Keep
-      // one active owner so an outgoing element cannot release the incoming
-      // loader's scroll lock during a body replacement.
       activeLoader?.cancel();
+      this.lifecycle = new AbortController();
+      this.ready = this.commandReady = this.dismissed = false;
       activeLoader = this;
+      this.setAttribute("data-active", "");
 
       document.documentElement.dataset.loaderState = "loading";
       document.documentElement.classList.add("loader-scroll-lock");
@@ -81,121 +91,77 @@ const t = useTranslations(locale);
       );
 
       const isGeneric = this.dataset.mode === "generic";
-      const typeDuration = Number(this.dataset.typeDuration ?? 0);
       if (isGeneric || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         this.markCommandComplete();
       } else {
-        this.typeCommand(this.dataset.command ?? "", typeDuration);
+        const animation = this.querySelector(".loader-command-text")?.getAnimations()
+          .find((animation) => (animation as CSSAnimation).animationName === "loader-type");
+        if (animation) {
+          void animation.finished.then(
+            () => this.markCommandComplete(),
+            () => this.markCommandComplete(),
+          );
+        } else this.markCommandComplete();
       }
 
       const isClientNavigation =
         document.documentElement.dataset.clientNavigation === "true";
       if (isClientNavigation) {
-        // ClientRouter has fetched and swapped the new document, but the
-        // incoming page has not finished its own lifecycle yet. Keep the
-        // overlay active through Astro's completion signal.
-        this.onPageLoad = () => {
-          this.ready = true;
-          this.dismissWhenReady();
-        };
-        document.addEventListener("astro:page-load", this.onPageLoad, {
+        document.addEventListener("astro:page-load", () => void this.waitForAssets(), {
           once: true,
-        });
-        this.later(5000, () => {
-          this.ready = true;
-          this.dismissWhenReady();
+          signal: this.lifecycle.signal,
         });
       } else if (document.readyState === "complete") {
-        this.ready = true;
+        void this.waitForAssets();
       } else {
-        this.onLoad = () => {
-          this.ready = true;
-          this.dismissWhenReady();
-        };
-        window.addEventListener("load", this.onLoad, { once: true });
-        this.later(5000, () => {
-          this.ready = true;
-          this.dismissWhenReady();
+        window.addEventListener("load", () => void this.waitForAssets(), {
+          once: true,
+          signal: this.lifecycle.signal,
         });
       }
+    }
+
+    private async waitForAssets() {
+      const signal = this.lifecycle.signal;
+      const portrait = document.querySelector<HTMLImageElement>("hero-section .hero-portrait");
+      await Promise.allSettled([document.fonts.ready, ...(portrait ? [portrait.decode()] : [])]);
+      if (signal.aborted || !this.isConnected) return;
+      this.ready = true;
       this.dismissWhenReady();
     }
 
     private dismissWhenReady() {
-      if (this.dismissed || !this.ready || !this.typed) return;
+      if (this.dismissed || !this.ready || !this.commandReady) return;
       this.dismiss();
     }
 
     private markCommandComplete() {
-      this.typed = true;
+      if (this.dismissed || this.commandReady || this.holdTimer !== undefined) return;
       this.setAttribute("data-command-complete", "");
-      this.dismissWhenReady();
-    }
-
-    private typeCommand(command: string, duration: number) {
-      const commandEl = this.querySelector<HTMLElement>(".loader-command");
-      if (!commandEl || !command) {
-        this.markCommandComplete();
+      if (this.dataset.mode === "generic") {
+        this.commandReady = true;
+        this.dismissWhenReady();
         return;
       }
-
-      commandEl.textContent = "";
-      this.setAttribute("data-command-hydrated", "");
-      const characters = Array.from(command);
-      // Give each character a slightly different dwell time. The timer is
-      // anchored to the first rendered frame, not to component setup: first
-      // load can be busy parsing scripts and painting the page.
-      const weights = characters.map((character, index) => {
-        if (/\s/.test(character)) return 0.55;
-        if (index === characters.length - 1) return 1.2;
-        return 0.8 + ((index * 17) % 5) * 0.1;
-      });
-      const weightTotal = weights.reduce((total, weight) => total + weight, 0);
-      const characterDelays = weights.map(
-        (weight) => (duration * weight) / weightTotal,
-      );
-      let index = 0;
-      let nextCharacterAt = 0;
-      const typeNext = (now: number) => {
-        if (this.dismissed) return;
-        if (!nextCharacterAt) {
-          nextCharacterAt = now + (characterDelays[index] ?? 0);
-        }
-
-        // Reveal no more than one character in a frame. If the main thread
-        // is delayed on first load, the animation slows briefly instead of
-        // jumping forward by several characters to catch up.
-        if (now >= nextCharacterAt) {
-          commandEl.textContent += characters[index] ?? "";
-          index += 1;
-          nextCharacterAt = now + (characterDelays[index] ?? 0);
-        }
-        if (index < characters.length) {
-          this.animationFrame = requestAnimationFrame(typeNext);
-        } else {
-          this.animationFrame = undefined;
-          this.markCommandComplete();
-        }
-      };
-      this.later(120, () => {
-        this.animationFrame = requestAnimationFrame(typeNext);
-      });
+      this.holdTimer = window.setTimeout(() => {
+        this.holdTimer = undefined;
+        this.commandReady = true;
+        this.dismissWhenReady();
+      }, 1000);
     }
 
     private cancel() {
-      if (this.dismissed) return;
       this.dismissed = true;
-      this.timers.forEach(window.clearTimeout);
-      this.timers = [];
-      if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
-      if (this.onLoad) window.removeEventListener("load", this.onLoad);
-      if (this.onPageLoad)
-        document.removeEventListener("astro:page-load", this.onPageLoad);
+      this.lifecycle.abort();
+      window.clearTimeout(this.removeTimer);
+      window.clearTimeout(this.holdTimer);
+      this.holdTimer = undefined;
     }
 
     private dismiss() {
       if (this.dismissed) return;
       this.dismissed = true;
+      this.lifecycle.abort();
       document.documentElement.dataset.loaderState = "dismissed";
       this.querySelector<HTMLElement>(".loader-overlay")?.classList.add("is-dismissing");
       window.dispatchEvent(new CustomEvent("loader:dismiss"));
@@ -203,22 +169,18 @@ const t = useTranslations(locale);
         new CustomEvent("loader:statechange", { detail: { state: "dismissed" } }),
       );
       const duration = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 160 : 420;
-      this.later(duration, () => {
+      this.removeTimer = window.setTimeout(() => {
         if (activeLoader === this) {
           activeLoader = undefined;
           document.documentElement.classList.remove("loader-scroll-lock");
         }
         this.remove();
-      });
+      }, duration);
     }
 
     disconnectedCallback() {
-      this.timers.forEach(window.clearTimeout);
-      this.timers = [];
-      if (this.animationFrame) cancelAnimationFrame(this.animationFrame);
-      if (this.onLoad) window.removeEventListener("load", this.onLoad);
-      if (this.onPageLoad)
-        document.removeEventListener("astro:page-load", this.onPageLoad);
+      this.removeAttribute("data-active");
+      this.cancel();
       if (activeLoader === this) {
         activeLoader = undefined;
         document.documentElement.classList.remove("loader-scroll-lock");
@@ -247,8 +209,10 @@ const t = useTranslations(locale);
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
-    min-width: min(28rem, calc(100vw - 3rem));
-    font-family: var(--font-mono);
+    inline-size: max-content;
+    min-inline-size: min(28rem, calc(100vw - 3rem));
+    max-inline-size: calc(100vw - 3rem);
+    font-family: ui-monospace, monospace;
     font-size: clamp(0.9rem, 2.4vw, 1.2rem);
     letter-spacing: 0.03em;
   }
@@ -263,31 +227,58 @@ const t = useTranslations(locale);
   .loader-prompt,
   .loader-status { color: var(--ink-dim); }
 
+  .loader-command-line {
+    align-items: baseline;
+    column-gap: 1ch;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: thin;
+  }
+
+  .loader-prompt,
+  .loader-command {
+    flex-shrink: 0;
+  }
+
   .loader-status {
     opacity: 0;
     transform: translateY(0.25rem);
-  }
-
-  boot-loader[data-mode="generic"] .loader-status,
-  boot-loader[data-command-complete] .loader-status {
-    animation: loader-status-in 180ms var(--ease) both;
+    animation: loader-status-in 180ms var(--ease) var(--type-duration, 0ms) both;
   }
 
   .loader-command {
-    display: inline-block;
+    position: relative;
+    display: inline-grid;
     white-space: nowrap;
+    padding-inline-end: 0.8ch;
+    letter-spacing: normal;
     color: var(--ink);
   }
 
-  boot-loader:not([data-command-hydrated]) .loader-command {
-    visibility: hidden;
+  .loader-command-text {
+    display: inline-block;
+    animation: loader-type var(--type-duration) steps(var(--command-length), end) both;
+  }
+
+  boot-loader[data-command-complete] .loader-command-text {
+    clip-path: none;
   }
 
   .loader-cursor {
-    width: 0.55ch;
-    height: 1.05em;
-    margin-left: 0.2ch;
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block-start: 50%;
+    inline-size: 0.55ch;
+    block-size: 1.05em;
+    margin-block-start: -0.525em;
+    margin-inline-start: 0.2ch;
     background: var(--ink);
+    transform: translateX(var(--command-width));
+    animation: loader-travel var(--type-duration) steps(var(--command-length), end) both,
+      loader-cursor 1s steps(2) infinite;
+  }
+
+  boot-loader[data-command-complete] .loader-cursor {
     animation: loader-cursor 1s steps(2) infinite;
   }
 
@@ -307,6 +298,16 @@ const t = useTranslations(locale);
     50% { opacity: 0; }
   }
 
+  @keyframes loader-type {
+    from { clip-path: inset(0 100% 0 0); }
+    to { clip-path: inset(0); }
+  }
+
+  @keyframes loader-travel {
+    from { transform: translateX(0); }
+    to { transform: translateX(var(--command-width)); }
+  }
+
   @keyframes loader-dots {
     50% { opacity: 0.35; }
   }
@@ -316,8 +317,8 @@ const t = useTranslations(locale);
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .loader-command { visibility: visible !important; }
-    .loader-cursor, .loader-dots { animation: none; }
+    .loader-command-text, .loader-cursor, .loader-dots { animation: none; }
+    .loader-status { animation: none; opacity: 1; transform: none; }
     .loader-overlay { transition-duration: 160ms; }
   }
 </style>

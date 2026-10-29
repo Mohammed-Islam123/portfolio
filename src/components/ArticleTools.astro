@@ -25,6 +25,7 @@ const t = useTranslations(locale);
 
 <script>
   import { useTranslations } from "../config/i18n";
+  import { getLenis } from "../scripts/smooth-scroll";
   const t = (message: string) => useTranslations(document.documentElement.lang === "fr" ? "fr" : "en")(message);
   class ArticleTools extends HTMLElement {
     private abort?: AbortController;
@@ -52,7 +53,9 @@ const t = useTranslations(locale);
         "click",
         () => {
           const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-          window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
+          const lenis = getLenis();
+          if (lenis && !reducedMotion) lenis.scrollTo(0, { duration: 1.1 });
+          else window.scrollTo({ top: 0, behavior: reducedMotion ? "auto" : "smooth" });
         },
         { signal: this.abort.signal },
       );

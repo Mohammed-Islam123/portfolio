@@ -76,3 +76,21 @@ test("both homepages expose localized profiles, real portraits and reciprocal la
     assert.doesNotMatch(html, /<meta name="robots" content="[^"]*\bnoindex\b/);
   }
 });
+
+test("homepages render readable fallbacks and separate card and viewer image URLs", () => {
+  for (const path of ["index.html", "fr/index.html"]) {
+    const { html } = pages.find((page) => page.path === path);
+    assert.doesNotMatch(html, /class="[^"]*\breveal-init\b/);
+    assert.doesNotMatch(html, /<boot-loader[^>]*\bdata-active/);
+    assert.ok(html.indexOf("<boot-loader") < html.indexOf("<hero-section"));
+    assert.match(html, /<span class="loader-command-text"[^>]*>whoami<\/span>/);
+    assert.match(html, /<span class="sn-text[^>]*>Mohamed Islam Benyahkem<\/span>/);
+    const encoded = html.match(/<hero-journey\b[^>]*\bdata-media="([^"]+)"/)[1];
+    const media = JSON.parse(encoded.replaceAll("&quot;", '"').replaceAll("&amp;", "&"));
+    assert.ok(media.length > 0);
+    for (const item of media) {
+      assert.ok(item.thumbnail.startsWith("/Images/Hero/thumbnails/"));
+      assert.ok(item.source.startsWith("/Images/Hero/") && !item.source.includes("/thumbnails/"));
+    }
+  }
+});

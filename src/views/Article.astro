@@ -45,10 +45,10 @@ const heroImage = thumbnail?.src;
   {heroImage && (
     <article-hero class="article-hero" style={`--article-image:url('${heroImage}')`} aria-hidden="true">
       <div class="article-hero__image"></div>
+      <div class="article-hero__image article-hero__blur" data-article-hero-blur></div>
       <div class="article-hero__tint"></div>
       <div class="article-hero__wash"></div>
     </article-hero>
-    <div class="article-hero__blur" data-article-hero-blur aria-hidden="true"></div>
   )}
 
   <main class="article-page">
@@ -97,22 +97,26 @@ const heroImage = thumbnail?.src;
     connectedCallback() {
       this.abort?.abort();
       this.abort = new AbortController();
-      const blurLayer = document.querySelector<HTMLElement>("[data-article-hero-blur]");
-
-      // Astro's CSS pipeline emits only the legacy prefixed form here, which
-      // Chromium does not apply to this transparent overlay. Set the standard
-      // property directly so the backdrop is genuinely blurred.
-      blurLayer?.style.setProperty("backdrop-filter", "blur(40px)");
+      const blurLayer = this.querySelector<HTMLElement>("[data-article-hero-blur]");
+      if (!blurLayer) return;
+      const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+      let lastOpacity = -1;
 
       const update = () => {
-        this.frame = 0;
-        blurLayer?.style.setProperty("--article-hero-blur", String(Math.min(1, window.scrollY / 360)));
+        const opacity = motion.matches ? 0 : Math.max(0, Math.min(1, window.scrollY / 360));
+        if (opacity === lastOpacity) return;
+        lastOpacity = opacity;
+        blurLayer.style.opacity = String(opacity);
       };
       const onScroll = () => {
-        if (!this.frame) this.frame = requestAnimationFrame(update);
+        if (!motion.matches && !this.frame) this.frame = requestAnimationFrame(() => {
+          this.frame = 0;
+          update();
+        });
       };
 
       window.addEventListener("scroll", onScroll, { passive: true, signal: this.abort.signal });
+      motion.addEventListener("change", update, { signal: this.abort.signal });
       update();
     }
 
@@ -148,14 +152,8 @@ const heroImage = thumbnail?.src;
     opacity: var(--article-hero-image-opacity);
   }
   .article-hero__blur {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    height: 100svh;
-    pointer-events: none;
-    opacity: var(--article-hero-blur, 0);
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
+    opacity: 0;
+    filter: blur(40px);
   }
   .article-hero__tint { background: var(--article-hero-tint); }
   .article-hero__wash {
